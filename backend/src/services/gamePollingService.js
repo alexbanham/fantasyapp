@@ -1,0 +1,242 @@
+const cron = require('node-cron');
+const Game = require('../models/Game');
+const Config = require('../models/Config');
+const espnService = require('../services/espnService');
+class GamePollingService {
+  constructor() {
+    this.isPolling = false;
+    this.pollInterval = parseInt(process.env.GAME_POLL_ACTIVE_INTERVAL);
+    this.idleInterval = parseInt(process.env.GAME_POLL_IDLE_INTERVAL);
+    this.currentInterval = this.idleInterval;
+    this.pollTimer = null;
+    this.lastPollTime = null;
+    this.consecutiveErrors = 0;
+    this.maxConsecutiveErrors = parseInt(process.env.GAME_POLL_MAX_CONSECUTIVE_ERRORS);
+    // Validate required environment variables
+    this.validateEnvironment();
+  }
+  // Validate required environment variables
+  validateEnvironment() {
+    const requiredVars = [
+      'GAME_POLL_ACTIVE_INTERVAL',
+      'GAME_POLL_IDLE_INTERVAL',
+      'GAME_POLL_MAX_CONSECUTIVE_ERRORS'
+    ];
+    const missingVars = requiredVars.filter(varName => !process.env[varName]);
+    if (missingVars.length > 0) {
+      // Always throw error - no fallbacks allowed
+      throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+    }
+    // Validate numeric values
+    if (isNaN(this.pollInterval) || this.pollInterval <= 0) {
+      throw new Error('GAME_POLL_ACTIVE_INTERVAL must be a positive number');
+    }
+    if (isNaN(this.idleInterval) || this.idleInterval <= 0) {
+      throw new Error('GAME_POLL_IDLE_INTERVAL must be a positive number');
+    }
+    if (isNaN(this.maxConsecutiveErrors) || this.maxConsecutiveErrors <= 0) {
+      throw new Error('GAME_POLL_MAX_CONSECUTIVE_ERRORS must be a positive number');
+    }
+  }
+  // Start polling service
+  async start() {
+    if (this.isPolling) {
+      return;
+    }
+    // Check if polling is enabled in config
+    const configEnabled = await this.isPollingEnabled();
+    if (!configEnabled) {
+      return;
+    }
+    this.isPolling = true;
+    this.poll();
+    // Schedule regular polling
+    this.schedulePolling();
+  }
+  // Stop polling service
+  stop() {
+    if (!this.isPolling) {
+      return;
+    }
+    this.isPolling = false;
+    if (this.pollTimer) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+  // Schedule next poll based on current game status
+  schedulePolling() {
+    if (!this.isPolling) return;
+    // Determine polling interval based on live games
+    this.currentInterval = this.shouldPollFrequently() ? this.pollInterval : this.idleInterval;
+    this.pollTimer = setTimeout(() => {
+      this.poll();
+    }, this.currentInterval);
+  }
+  // Check if we should poll frequently (during active games)
+  shouldPollFrequently() {
+    const now = new Date();
+    const gameTime = new Date(now.getTime() + (2 * 60 * 60 * 1000)); // 2 hours from now
+    // Poll frequently if there are live games or games starting soon
+    return Game.countDocuments({
+      $or: [
+        { status: 'in', isLive: true },
+        { 
+          status: 'scheduled', 
+          date: { $gte: now, $lte: gameTime } 
+        }
+      ]
+    }).then(count => count > 0);
+  }
+  // Check if polling is enabled in config
+  async isPollingEnabled() {
+    try {
+      const config = await Config.getConfig();
+      return config.pollingEnabled;
+    } catch (error) {
+      return false; // Default to disabled if config check fails
+    }
+  }
+  // Main polling function
+  async poll() {
+    if (!this.isPolling) return;
+    // Check if polling is enabled in config
+    const configEnabled = await this.isPollingEnabled();
+    if (!configEnabled) {
+      this.stop();
+      return;
+    }
+    try {
+      // Get current week info from config database
+      const config = await Config.getConfig();
+      const weekInfo = {
+        week: config.currentWeek,
+        season: config.currentSeason
+      };
+      // Fetch scoreboard data
+      const games = await espnService.fetchScoreboard(weekInfo.week, weekInfo.season);
+      // Process each game
+      let updatedCount = 0;
+      let newCount = 0;
+      for (const gameData of games) {
+        try {
+          const result = await this.processGame(gameData);
+          if (result.isNew) {
+            newCount++;
+          } else if (result.isUpdated) {
+            updatedCount++;
+          }
+        } catch (error) {
+          console.error('Error processing game:', error);
+        }
+      }
+      // Cleanup: Mark old games as not live if they haven't been updated recently
+      await this.cleanupOldLiveGames();
+      // Reset error counter on successful poll
+      this.consecutiveErrors = 0;
+      this.lastPollTime = new Date();
+    } catch (error) {
+      this.consecutiveErrors++;
+      // Don't stop completely, just use longer intervals
+      if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
+        this.consecutiveErrors = 0; // Reset counter but keep polling
+        this.currentInterval = this.idleInterval; // Use configured idle interval
+      } else {
+        // Use longer interval on errors
+        this.currentInterval = Math.min(this.currentInterval * 2, this.idleInterval); // Max idle interval
+      }
+    }
+    // Schedule next poll
+    this.schedulePolling();
+  }
+  // Process individual game data
+  async processGame(gameData) {
+    try {
+      // Generate hash for change detection
+      const dataHash = espnService.generateGameHash(gameData);
+      // Check if game exists
+      const existingGame = await Game.findOne({ eventId: gameData.eventId });
+      if (!existingGame) {
+        // New game
+        const newGame = new Game({
+          ...gameData,
+          dataHash
+        });
+        await newGame.save();
+        return { isNew: true, isUpdated: false };
+      }
+      // Check if data has changed
+      if (existingGame.dataHash === dataHash) {
+        // No changes, just update lastUpdated timestamp
+        existingGame.lastUpdated = new Date();
+        await existingGame.save();
+        return { isNew: false, isUpdated: false };
+      }
+      // Data has changed, update the game
+      Object.assign(existingGame, gameData, { dataHash });
+      await existingGame.save();
+      return { isNew: false, isUpdated: true };
+    } catch (error) {
+      throw error;
+    }
+  }
+  // Restart polling service
+  restart() {
+    this.stop();
+    setTimeout(() => {
+      this.start();
+    }, 1000);
+  }
+  // Start polling service without config check (for config route)
+  async startForced() {
+    if (this.isPolling) {
+      return;
+    }
+    this.isPolling = true;
+    this.poll();
+    // Schedule regular polling
+    this.schedulePolling();
+  }
+  // Manual poll trigger (for testing)
+  async manualPoll() {
+    await this.poll();
+  }
+  // Cleanup old live games
+  async cleanupOldLiveGames() {
+    try {
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+      const result = await Game.updateMany(
+        { 
+          isLive: true, 
+          lastUpdated: { $lt: thirtyMinutesAgo } 
+        },
+        { 
+          $set: { isLive: false } 
+        }
+      );
+      if (result.modifiedCount > 0) {
+        console.log(`Marked ${result.modifiedCount} games as not live`);
+      }
+    } catch (error) {
+      console.error('Error cleaning up old live games:', error);
+    }
+  }
+  // Get polling status
+  getStatus() {
+    return {
+      isPolling: this.isPolling,
+      currentInterval: this.currentInterval,
+      lastPollTime: this.lastPollTime,
+      consecutiveErrors: this.consecutiveErrors,
+      nextPollIn: this.pollTimer ? this.currentInterval : null
+    };
+  }
+}
+// Create singleton instance
+const gamePollingService = new GamePollingService();
+// Export for use in other modules
+module.exports = gamePollingService;
+// Auto-start if this file is run directly
+if (require.main === module) {
+  gamePollingService.start();
+}

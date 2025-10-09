@@ -1,0 +1,42 @@
+{
+  "name": "fantasy-football-backend",
+  "version": "1.0.0",
+  "description": "Backend API for fantasy football draft tool",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest",
+    "data:fetch": "node src/cron/fetchData.js",
+    "data:update": "node src/cron/updateData.js",
+    "sync:week": "node -e \"require('dotenv').config(); require('./src/services/boxscoreSync').syncWeek(process.env.SEASON_ID, process.env.WEEK).then(r => {console.log(r); process.exit(0)}).catch(e => {console.error(e); process.exit(1)})\"",
+    "sync:backfill": "node -e \"require('dotenv').config(); require('./src/services/boxscoreSync').backfillSeason(process.env.SEASON_ID, 18).then(r => {console.log(r); process.exit(0)}).catch(e => {console.error(e); process.exit(1)})\""
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.12.2",
+    "bottleneck": "^2.19.5",
+    "cheerio": "^1.1.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "espn-fantasy-football-api": "^2.0.1",
+    "express": "^4.18.2",
+    "fuse.js": "^7.1.0",
+    "helmet": "^7.0.0",
+    "mongoose": "^7.5.0",
+    "morgan": "^1.10.0",
+    "node-cache": "^5.1.2",
+    "node-cron": "^3.0.2"
+  },
+  "devDependencies": {
+    "jest": "^29.6.2",
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "fantasy-football",
+    "draft-tool",
+    "api"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

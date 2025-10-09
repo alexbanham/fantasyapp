@@ -1,0 +1,309 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+  }
+
+  /* Purple Scheme */
+  .purple-scheme {
+    --primary: 270 100% 70%;
+    --primary-foreground: 0 0% 9%;
+    --accent: 270 50% 20%;
+    --accent-foreground: 0 0% 98%;
+    --border: 270 20% 20%;
+    --ring: 270 100% 70%;
+  }
+
+  /* Blackscale Scheme */
+  .blackscale-scheme {
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --accent: 0 0% 10%;
+    --accent-foreground: 0 0% 100%;
+    --border: 0 0% 20%;
+    --ring: 0 0% 100%;
+  }
+
+  /* Eagles Scheme */
+  .eagles-scheme {
+    --primary: 25 100% 50%;
+    --primary-foreground: 0 0% 9%;
+    --accent: 25 50% 20%;
+    --accent-foreground: 0 0% 98%;
+    --border: 25 20% 20%;
+    --ring: 25 100% 50%;
+  }
+
+  /* Cowboys Scheme */
+  .cowboys-scheme {
+    --primary: 210 100% 30%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 210 50% 20%;
+    --accent-foreground: 0 0% 98%;
+    --border: 210 20% 20%;
+    --ring: 210 100% 30%;
+  }
+
+  /* 49ers Scheme */
+  .niners-scheme {
+    --primary: 0 100% 33%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 0 50% 20%;
+    --accent-foreground: 0 0% 98%;
+    --border: 0 20% 20%;
+    --ring: 0 100% 33%;
+  }
+
+  /* Rams Scheme */
+  .rams-scheme {
+    --primary: 38 100% 50%;
+    --primary-foreground: 0 0% 0%;
+    --accent: 210 100% 30%;
+    --accent-foreground: 0 0% 98%;
+    --border: 210 20% 20%;
+    --ring: 38 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+/* Custom scrollbar for dark mode */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground));
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--accent-foreground));
+}
+
+/* Smooth transitions */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .glass {
+  background: rgba(88, 28, 135, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(139, 92, 246, 0.1);
+}
+
+/* Color Scheme Gradients */
+.purple-scheme {
+  background: linear-gradient(to bottom right, #1e1b4b, #7c3aed, #1e1b4b);
+}
+
+.purple-scheme body {
+  background: linear-gradient(to bottom right, #1e1b4b, #7c3aed, #1e1b4b);
+}
+
+.blackscale-scheme {
+  background: linear-gradient(to bottom right, #000000, #2a2a2a, #000000);
+}
+
+.blackscale-scheme body {
+  background: linear-gradient(to bottom right, #000000, #2a2a2a, #000000);
+}
+
+.eagles-scheme {
+  background: linear-gradient(to bottom right, #004c54, #a5ac29, #004c54);
+}
+
+.eagles-scheme body {
+  background: linear-gradient(to bottom right, #004c54, #a5ac29, #004c54);
+}
+
+.cowboys-scheme {
+  background: linear-gradient(to bottom right, #003594, #869397, #003594);
+}
+
+.cowboys-scheme body {
+  background: linear-gradient(to bottom right, #003594, #869397, #003594);
+}
+
+.niners-scheme {
+  background: linear-gradient(to bottom right, #AA0000, #B3995D, #AA0000);
+}
+
+.niners-scheme body {
+  background: linear-gradient(to bottom right, #AA0000, #B3995D, #AA0000);
+}
+
+.rams-scheme {
+  background: linear-gradient(to bottom right, #003594, #FFA300, #003594);
+}
+
+.rams-scheme body {
+  background: linear-gradient(to bottom right, #003594, #FFA300, #003594);
+}
+
+/* Color Scheme Glass Effects */
+.purple-scheme .glass {
+  background: rgba(88, 28, 135, 0.05);
+  border: 1px solid rgba(139, 92, 246, 0.1);
+}
+
+.blackscale-scheme .glass {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.eagles-scheme .glass {
+  background: rgba(0, 76, 84, 0.05);
+  border: 1px solid rgba(165, 172, 41, 0.1);
+}
+
+.cowboys-scheme .glass {
+  background: rgba(0, 53, 148, 0.05);
+  border: 1px solid rgba(134, 147, 151, 0.1);
+}
+
+.niners-scheme .glass {
+  background: rgba(170, 0, 0, 0.05);
+  border: 1px solid rgba(179, 153, 93, 0.1);
+}
+
+.rams-scheme .glass {
+  background: rgba(0, 53, 148, 0.05);
+  border: 1px solid rgba(255, 163, 0, 0.1);
+}
+
+/* News article image styles - ensure crisp rendering */
+.news-article img,
+[class*="news"] img {
+  image-rendering: auto;
+  image-rendering: crisp-edges;
+  image-rendering: -webkit-optimize-contrast;
+  filter: none !important;
+  backdrop-filter: none !important;
+  transform: translateZ(0); /* Force hardware acceleration */
+  will-change: transform;
+  isolation: isolate; /* Create new stacking context to prevent backdrop-filter inheritance */
+  backface-visibility: hidden; /* Prevent flickering */
+  -webkit-backface-visibility: hidden;
+}
+
+/* Override glass backdrop-filter for news article images */
+.glass .news-article img,
+.glass [class*="news"] img {
+  backdrop-filter: none !important;
+  filter: none !important;
+}
+
+/* News container without backdrop-filter to prevent image blurring */
+.news-container {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: none; /* Remove backdrop filter to prevent image blurring */
+}
+
+.dark .news-container {
+  background: rgba(88, 28, 135, 0.05);
+  border: 1px solid rgba(139, 92, 246, 0.1);
+  backdrop-filter: none; /* Remove backdrop filter to prevent image blurring */
+}
+
+/* Ensure news cards don't inherit blur effects */
+[class*="news-card"],
+[class*="NewsCard"] {
+  backdrop-filter: none !important;
+  filter: none !important;
+}
+
+/* High DPI display optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .news-article img,
+  [class*="news"] img {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}

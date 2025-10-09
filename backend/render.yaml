@@ -1,0 +1,80 @@
+services:
+  - type: web
+    name: fantasy-football-backend
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      # MongoDB - Required
+      - key: MONGODB_URI
+        sync: false
+        required: true
+        
+      # Server Configuration - Required
+      - key: PORT
+        value: 6300
+        required: true
+      - key: NODE_ENV
+        value: production
+        required: true
+        
+      # CORS - Required (update with your frontend URL)
+      - key: CORS_ORIGINS
+        value: https://your-frontend-url.vercel.app
+        required: true
+        
+      # API Configuration - Required
+      - key: API_TIMEOUT
+        value: 15000
+        required: true
+      - key: API_RETRY_ATTEMPTS
+        value: 3
+        required: true
+      - key: API_RETRY_DELAY
+        value: 2000
+        required: true
+        
+      # ESPN Configuration - Required
+      - key: ESPN_LEAGUE_ID
+        sync: false
+        required: true
+      - key: SEASON_ID
+        value: 2025
+        required: true
+      - key: ESPN_S2_COOKIE
+        sync: false
+        required: true
+      - key: ESPN_SWID_COOKIE
+        sync: false
+        required: true
+        
+      # Game Polling - Required
+      - key: GAME_POLL_ACTIVE_INTERVAL
+        value: 15000
+        required: true
+      - key: GAME_POLL_IDLE_INTERVAL
+        value: 300000
+        required: true
+      - key: GAME_POLL_MAX_CONSECUTIVE_ERRORS
+        value: 5
+        required: true
+        
+      # Logging - Required
+      - key: LOG_LEVEL
+        value: info
+        required: true
+      - key: ENABLE_API_LOGGING
+        value: true
+        
+      # Security - Required
+      - key: ADMIN_PASSWORD
+        sync: false
+        required: true
+        
+      # Optional
+      - key: DEBUG
+        value: false
+      - key: VERBOSE_LOGGING
+        value: false
+

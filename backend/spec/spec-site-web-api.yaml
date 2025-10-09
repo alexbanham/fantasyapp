@@ -1,0 +1,4426 @@
+openapi: 3.0.3
+info:
+  title: ESPN Site Web API
+  version: 1.0.0
+  description: Unofficial ESPN Site Web API for retrieving sports data from site.web.api.espn.com. This API is not officially supported by ESPN and may change without notice.
+
+servers:
+  - url: https://site.web.api.espn.com
+    description: ESPN Site Web API Production Server
+  - url: http://site.web.api.espn.com
+
+paths:
+  /apis/common/v3/sports/football/nfl/athletes/{athleteId}/overview:
+    get:
+      tags:
+        - NFL Athletes
+      summary: Get NFL athlete overview
+      operationId: getAthleteOverviewNFL
+      parameters:
+        - name: athleteId
+          in: path
+          required: true
+          description: ID of the athlete
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteOverviewResponse'
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /apis/common/v3/sports/football/nfl/athletes/{athleteId}/gamelog:
+    get:
+      summary: Get NFL Athlete Game Log
+      description: Retrieve game-by-game statistics for a specific NFL athlete
+      operationId: getNFLAthleteGameLog
+      parameters:
+        - name: athleteId
+          in: path
+          required: true
+          description: The athlete ID
+          schema:
+            type: string
+            example: "3139477"
+        - name: season
+          in: query
+          required: false
+          description: Season year to filter by
+          schema:
+            type: integer
+            example: 2023
+        - name: seasontype
+          in: query
+          required: false
+          description: Season type (1=preseason, 2=regular, 3=postseason)
+          schema:
+            type: integer
+            enum: [1, 2, 3]
+            example: 2
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteGameLogResponse'
+        '404':
+          description: Athlete game log not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/common/v3/sports/football/nfl/athletes/{athleteId}/splits:
+    get:
+      summary: Get NFL Athlete Splits
+      description: Retrieve split statistics for a specific NFL athlete (e.g., home/away, by opponent, etc)
+      operationId: getNFLAthleteSplits
+      parameters:
+        - name: athleteId
+          in: path
+          required: true
+          description: The athlete ID
+          schema:
+            type: string
+            example: "4430191"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteSplitsResponse'
+        '404':
+          description: Athlete splits not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/common/v3/search:
+    get:
+      summary: General Search
+      description: Search for sports content including teams, athletes, articles and more
+      operationId: getGeneralSearch
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Search query term
+          schema:
+            type: string
+            example: "Mahomes"
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results to return
+          schema:
+            type: integer
+            example: 10
+        - name: mode
+          in: query
+          required: false
+          description: Search mode (e.g., prefix, full)
+          schema:
+            type: string
+            enum: [prefix, full]
+            example: "prefix"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/search/v2:
+    get:
+      summary: General Search (v2)
+      description: Search for sports content including teams, athletes, articles and more (legacy v2 endpoint)
+      operationId: getGeneralSearchV2
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Search query term
+          schema:
+            type: string
+            example: "Tom Brady"
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results to return
+          schema:
+            type: integer
+            example: 2
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchV2Response'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/v2/scoreboard/header:
+    get:
+      summary: Get Scoreboard Header
+      description: Retrieve header information for scoreboard pages
+      operationId: getScoreboardHeader
+      parameters:
+        - name: sport
+          in: query
+          required: true
+          description: Sport identifier
+          schema:
+            $ref: '#/components/schemas/SportEnum'
+        - name: league
+          in: query
+          required: true
+          description: League identifier
+          schema:
+            $ref: '#/components/schemas/LeagueEnum'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreboardHeaderResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/v2/flex:
+    get:
+      summary: Get Contributor Posts
+      description: Retrieve contributor posts and content in a flexible layout format
+      operationId: getContributorPosts
+      parameters:
+        - name: region
+          in: query
+          required: false
+          description: Region code (e.g., us)
+          schema:
+            type: string
+            default: us
+        - name: lang
+          in: query
+          required: false
+          description: Language code (e.g., en)
+          schema:
+            type: string
+            default: en
+        - name: contentorigin
+          in: query
+          required: false
+          description: Content origin (e.g., espn)
+          schema:
+            type: string
+            default: espn
+        - name: contributor
+          in: query
+          required: false
+          description: Contributor slug or identifier (e.g., adam-schefter)
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of items to return
+          schema:
+            type: integer
+            default: 10
+        - name: pubkey
+          in: query
+          required: false
+          description: Publication key filter
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlexResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '1008':
+          description: Script error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/common/v3/sports/football/nfl/athletes/{athleteId}:
+    get:
+      tags:
+        - NFL Athletes
+      summary: Get NFL athlete profile
+      operationId: getAthleteProfileNFL
+      parameters:
+        - name: athleteId
+          in: path
+          required: true
+          description: ID of the athlete
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteProfileResponse'
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /apis/common/v3/sports/baseball/mlb/athletes/{athleteId}:
+    get:
+      tags:
+        - MLB Athletes
+      summary: Get MLB athlete profile
+      operationId: getAthleteProfileMLB
+      parameters:
+        - name: athleteId
+          in: path
+          required: true
+          description: ID of the athlete
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MLBAthleteDetailsResponse'
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /apis/common/v3/sports/{sport}/{league}/season:
+    get:
+      summary: Get season information
+      description: Retrieve season information including year, dates, and season types for a specific sport and league
+      operationId: getSeasonInfo
+      parameters:
+        - name: sport
+          in: path
+          required: true
+          description: Sport identifier
+          schema:
+            $ref: '#/components/schemas/SportEnum'
+        - name: league
+          in: path
+          required: true
+          description: League identifier
+          schema:
+            $ref: '#/components/schemas/LeagueEnum'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonInfoResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/common/v3/sports/{sport}/{league}/athletes/{athleteId}/bio:
+    get:
+      summary: Get athlete biography
+      description: Retrieve biographical information including team history and awards for a specific athlete
+      operationId: getAthleteBio
+      parameters:
+        - name: sport
+          in: path
+          required: true
+          description: Sport identifier
+          schema:
+            $ref: '#/components/schemas/SportEnum'
+        - name: league
+          in: path
+          required: true
+          description: League identifier
+          schema:
+            $ref: '#/components/schemas/LeagueEnum'
+        - name: athleteId
+          in: path
+          required: true
+          description: Athlete ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteBioResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/common/v3/sports/{sport}/{league}/athletes/{athleteId}/stats:
+    get:
+      summary: Get athlete statistics
+      description: Retrieve detailed career statistics for a specific athlete
+      operationId: getAthleteStats
+      parameters:
+        - name: sport
+          in: path
+          required: true
+          description: Sport identifier
+          schema:
+            $ref: '#/components/schemas/SportEnum'
+        - name: league
+          in: path
+          required: true
+          description: League identifier
+          schema:
+            $ref: '#/components/schemas/LeagueEnum'
+        - name: athleteId
+          in: path
+          required: true
+          description: Athlete ID
+          schema:
+            type: integer
+        - name: season
+          in: query
+          required: false
+          description: Season year
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteStatsResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/common/v3/sports/golf/athletes/{athleteId}/stats:
+    get:
+      summary: Get Golf Athlete Statistics
+      description: Retrieve detailed career statistics for a specific golf athlete
+      operationId: getGolfAthleteStats
+      parameters:
+        - name: athleteId
+          in: path
+          required: true
+          description: Golf athlete ID
+          schema:
+            type: integer
+        - name: season
+          in: query
+          required: false
+          description: Season year
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GolfAthleteStatsResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/site/v3/sports/{sport}/{league}/leaders:
+    get:
+      summary: Get League Leaders
+      description: Get statistical leaders for a specific sport and league (NFL, NHL, college sports, etc.)
+      operationId: getLeagueLeaders
+      parameters:
+        - name: sport
+          in: path
+          required: true
+          description: The sport (e.g., football, basketball, hockey)
+          schema:
+            type: string
+            enum: [football, basketball, hockey, baseball]
+        - name: league
+          in: path
+          required: true
+          description: The league (e.g., nfl, nhl, mens-college-basketball)
+          schema:
+            type: string
+        - name: season
+          in: query
+          required: false
+          description: The season year
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadersResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/site/v3/sports/{sport}/{league}/teamleaders:
+    get:
+      summary: Get Team Leaders
+      description: Get team leaders for various statistical categories in a specific sport and league
+      operationId: getTeamLeaders
+      parameters:
+        - name: sport
+          in: path
+          required: true
+          description: The sport (e.g., football, basketball, hockey, baseball)
+          schema:
+            type: string
+            enum: [football, basketball, hockey, baseball]
+        - name: league
+          in: path
+          required: true
+          description: The league (e.g., nfl, nba, nhl, mlb, wnba, college-football, mens-college-basketball, womens-college-basketball)
+          schema:
+            type: string
+        - name: season
+          in: query
+          required: false
+          description: The season year
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamLeadersResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /apis/fantasy/v2/games/ffl/games:
+    get:
+      tags:
+        - Fantasy Football
+      summary: Get Fantasy Football Games
+      description: Retrieve a list of NFL games with fantasy-relevant information
+      operationId: getFantasyFootballGames
+      parameters:
+        - name: dates
+          in: query
+          required: false
+          description: Date or date range (YYYYMMDD or YYYYMMDD-YYYYMMDD)
+          schema:
+            type: string
+            example: "20241201"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FantasyGamesResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    Reference:
+      type: object
+      properties:
+        $ref:
+          type: string
+          format: uri
+      required:
+        - $ref
+
+    AthleteOverviewResponse:
+      type: object
+      properties:
+        statistics:
+          $ref: '#/components/schemas/CareerStatistics'
+        news:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsItemDetailed'
+        athlete:
+          $ref: '#/components/schemas/AthleteDetails'
+          nullable: true
+        teams:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/Team'
+              - $ref: '#/components/schemas/TeamReference'
+        season:
+          $ref: '#/components/schemas/Season'
+
+    AthleteDetails:
+      type: object
+      required:
+        - id
+        - uid
+        - guid
+        - type
+        - firstName
+        - lastName
+        - fullName
+        - displayName
+      properties:
+        id:
+          type: string
+          example: "2330"
+        uid:
+          type: string
+          example: "s:20~a:2330"
+        guid:
+          type: string
+          example: "02927b1c67269964a3263940c6c17491"
+        type:
+          type: string
+          example: "football"
+        alternateIds:
+          type: object
+          properties:
+            sdr:
+              type: string
+              example: "2330"
+        firstName:
+          type: string
+          example: "Tom"
+        lastName:
+          type: string
+          example: "Brady"
+        fullName:
+          type: string
+          example: "Tom Brady"
+        displayName:
+          type: string
+          example: "Tom Brady"
+        shortName:
+          type: string
+          example: "T. Brady"
+        weight:
+          type: number
+          format: float
+          example: 225
+        displayWeight:
+          type: string
+          example: "225 lbs"
+        height:
+          type: number
+          format: integer
+          example: 76
+        displayHeight:
+          type: string
+          example: "6' 4\\\""
+        age:
+          type: integer
+          example: 46
+        dateOfBirth:
+          type: string
+          format: date-time
+          example: "1977-08-03T07:00:00Z"
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        birthPlace:
+          $ref: '#/components/schemas/BirthPlace'
+        college:
+          type: object
+          properties:
+            id:
+              type: string
+              nullable: true
+            mascot:
+              type: string
+              nullable: true
+            name:
+              type: string
+              nullable: true
+            shortName:
+              type: string
+              nullable: true
+          additionalProperties: true
+        slug:
+          type: string
+          example: "tom-brady"
+        headshot:
+          $ref: '#/components/schemas/Headshot'
+        jersey:
+          type: string
+          example: "12"
+        position:
+          $ref: '#/components/schemas/Position'
+        injuries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Injury'
+          nullable: true
+        teams:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/Team'
+              - $ref: '#/components/schemas/TeamReference'
+        experience:
+          $ref: '#/components/schemas/Experience'
+        status:
+          $ref: '#/components/schemas/Status'
+        eventLog:
+          $ref: '#/components/schemas/Reference'
+          nullable: true
+        active:
+          type: boolean
+          example: true
+        debutYear:
+          type: integer
+          example: 2000
+        draft:
+          $ref: '#/components/schemas/Draft'
+          nullable: true
+        notes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Note'
+          nullable: true
+        hand:
+          $ref: '#/components/schemas/Hand'
+          nullable: true
+        transactions:
+          $ref: '#/components/schemas/Reference'
+          nullable: true
+        flag:
+          $ref: '#/components/schemas/Flag'
+          nullable: true
+        career:
+          $ref: '#/components/schemas/Reference'
+          nullable: true
+
+    AthleteGameLogResponse:
+      type: object
+      properties:
+        events:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/GameEvent'
+          description: A dictionary of events, keyed by event ID
+        requested_season:
+          $ref: '#/components/schemas/RequestedSeason'
+        season:
+          $ref: '#/components/schemas/GameLogSeason'
+      required:
+        - events
+
+    GameEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "401671788"
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        week:
+          type: integer
+          example: 14
+        atVs:
+          type: string
+          enum: ["vs", "@"]
+          example: "vs"
+        gameDate:
+          type: string
+          format: date-time
+          example: "2024-12-09T01:20:00.000+00:00"
+        score:
+          type: string
+          example: "19-17"
+        homeTeamId:
+          type: string
+          example: "12"
+        awayTeamId:
+          type: string
+          example: "24"
+        homeTeamScore:
+          type: string
+          example: "19"
+        awayTeamScore:
+          type: string
+          example: "17"
+        gameResult:
+          type: string
+          enum: ["W", "L", "T"]
+          example: "W"
+        opponent:
+          $ref: '#/components/schemas/GameEventTeam'
+        leagueName:
+          type: string
+          example: "National Football League"
+        leagueAbbreviation:
+          type: string
+          example: "NFL"
+        leagueShortName:
+          type: string
+          example: "NFL"
+        team:
+          $ref: '#/components/schemas/GameEventTeam'
+      required:
+        - id
+        - gameDate
+        - score
+        - opponent
+        - team
+
+    GameEventTeam:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "24"
+        uid:
+          type: string
+          example: "s:20~l:28~t:24"
+        abbreviation:
+          type: string
+          example: "LAC"
+        displayName:
+          type: string
+          example: "Los Angeles Chargers"
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        logo:
+          type: string
+          format: uri
+          example: "https://a.espncdn.com/i/teamlogos/nfl/500/lac.png"
+        isAllStar:
+          type: boolean
+          example: false
+      required:
+        - id
+        - abbreviation
+
+    RequestedSeason:
+      type: object
+      properties:
+        year:
+          type: integer
+          example: 2024
+        type:
+          type: integer
+          example: 2
+        name:
+          type: string
+          example: "Regular Season"
+        displayName:
+          type: string
+          example: "2024 Regular Season"
+      required:
+        - year
+        - type
+
+    GameLogSeason:
+      type: object
+      properties:
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeasonType'
+        year:
+          type: integer
+          example: 2024
+      required:
+        - year
+        - types
+
+    SeasonType:
+      type: object
+      properties:
+        type:
+          type: integer
+          example: 2
+        name:
+          type: string
+          example: "Regular Season"
+        abbreviation:
+          type: string
+          example: "reg"
+        startDate:
+          type: string
+          format: date
+          example: "2024-09-05"
+        endDate: 
+          type: string
+          format: date
+          example: "2025-01-05"
+        hasStandings:
+          type: boolean
+          example: true
+      required:
+        - type
+        - name
+
+    SearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+        metadata:
+          $ref: '#/components/schemas/SearchMetadata'
+      required:
+        - results
+
+    SearchResult:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "athlete"
+          description: "Type of search result (athlete, team, article, etc.)"
+        id:
+          type: string
+          example: "3139477"
+        uid:
+          type: string
+          example: "s:20~l:28~a:3139477"
+        name:
+          type: string
+          example: "Patrick Mahomes"
+        description:
+          type: string
+          example: "Kansas City Chiefs quarterback"
+        sport:
+          $ref: '#/components/schemas/SportReference'
+        league:
+          $ref: '#/components/schemas/LeagueReference'
+        team:
+          $ref: '#/components/schemas/TeamReference'
+        image:
+          type: string
+          format: uri
+          example: "https://a.espncdn.com/i/headshots/nfl/players/full/3139477.png"
+        url:
+          type: string
+          format: uri
+          example: "https://www.espn.com/nfl/player/_/id/3139477/patrick-mahomes"
+      required:
+        - type
+        - id
+        - name
+
+    SearchMetadata:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 10
+        totalCount:
+          type: integer
+          example: 125
+        offset:
+          type: integer
+          example: 0
+      required:
+        - count
+
+    ScoreboardHeaderResponse:
+      type: object
+      properties:
+        sports:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              uid:
+                type: string
+              name:
+                type: string
+              abbreviation:
+                type: string
+              shortName:
+                type: string
+              slug:
+                type: string
+              tag:
+                type: string
+              isTournament:
+                type: boolean
+              leagues:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    uid:
+                      type: string
+                    name:
+                      type: string
+                    abbreviation:
+                      type: string
+                    shortName:
+                      type: string
+                    slug:
+                      type: string
+                    tag:
+                      type: string
+                    isTournament:
+                      type: boolean
+                    smartdates:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          label:
+                            type: string
+                          season:
+                            type: integer
+                          seasontype:
+                            type: integer
+                          week:
+                            type: integer
+                    events:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          uid:
+                            type: string
+                          guid:
+                            type: string
+                          date:
+                            type: string
+                            format: date-time
+                          timeValid:
+                            type: boolean
+                          recent:
+                            type: boolean
+                          name:
+                            type: string
+                          shortName:
+                            type: string
+                          links:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                rel:
+                                  type: array
+                                  items:
+                                    type: string
+                                href:
+                                  type: string
+                                text:
+                                  type: string
+                                shortText:
+                                  type: string
+                                isExternal:
+                                  type: boolean
+                                isPremium:
+                                  type: boolean
+                                isHidden:
+                                  type: boolean
+                                language:
+                                  type: string
+                              additionalProperties: true
+                          gamecastAvailable:
+                            type: boolean
+                          playByPlayAvailable:
+                            type: boolean
+                          commentaryAvailable:
+                            type: boolean
+                          wallclockAvailable:
+                            type: boolean
+                          onWatch:
+                            type: boolean
+                          competitionId:
+                            type: string
+                          location:
+                            type: string
+                          season:
+                            type: integer
+                          seasonStartDate:
+                            type: string
+                          seasonEndDate:
+                            type: string
+                          seasonType:
+                            type: string
+                          seasonTypeHasGroups:
+                            type: boolean
+                          group:
+                            type: object
+                            properties:
+                              groupId:
+                                type: string
+                              name:
+                                type: string
+                              abbreviation:
+                                type: string
+                              shortName:
+                                type: string
+                          week:
+                            type: integer
+                          weekText:
+                            type: string
+                          link:
+                            type: string
+                          status:
+                            type: string
+                          summary:
+                            type: string
+                          period:
+                            type: integer
+                          clock:
+                            type: string
+                          broadcasts:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                typeId:
+                                  type: integer
+                                priority:
+                                  type: integer
+                                type:
+                                  type: string
+                                isNational:
+                                  type: boolean
+                                broadcasterId:
+                                  type: integer
+                                broadcastId:
+                                  type: integer
+                                name:
+                                  type: string
+                                shortName:
+                                  type: string
+                                callLetters:
+                                  type: string
+                                station:
+                                  type: string
+                                lang:
+                                  type: string
+                                region:
+                                  type: string
+                                slug:
+                                  type: string
+                          broadcast:
+                            type: string
+                          odds:
+                            type: object
+                            additionalProperties: true
+                          fullStatus:
+                            type: object
+                            additionalProperties: true
+                          competitors:
+                            type: array
+                            items:
+                              type: object
+                              additionalProperties: true
+                          neutralSite:
+                            type: boolean
+                          appLinks:
+                            type: array
+                            items:
+                              type: object
+                              additionalProperties: true
+                      additionalProperties: true
+                  additionalProperties: true
+            additionalProperties: true
+      required:
+        - sports
+
+    NavigationItem:
+      type: object
+      properties:
+        label:
+          type: string
+          example: "Scores"
+        url:
+          type: string
+          format: uri
+          example: "/nfl/scoreboard"
+        isActive:
+          type: boolean
+          example: true
+      required:
+        - label
+        - url
+
+    ScoreboardEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "401547417"
+        name:
+          type: string
+          example: "Kansas City Chiefs vs. Philadelphia Eagles"
+        shortName:
+          type: string
+          example: "KC vs PHI"
+        date:
+          type: string
+          format: date-time
+          example: "2023-02-12T23:30:00Z"
+        homeTeam:
+          $ref: '#/components/schemas/TeamReference'
+        awayTeam:
+          $ref: '#/components/schemas/TeamReference'
+        status:
+          $ref: '#/components/schemas/EventStatus'
+      required:
+        - id
+        - name
+        - date
+
+    EventStatus:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [pre, in, post]
+          example: "post"
+        detail:
+          type: string
+          example: "Final"
+        shortDetail:
+          type: string
+          example: "Final"
+      required:
+        - state
+
+    LeagueReference:
+      type: object
+      properties:
+        $ref:
+          type: string
+          format: uri
+      required:
+        - $ref
+
+    SportReference:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "20"
+        name:
+          type: string
+          example: "Football"
+        slug:
+          type: string
+          example: "football"
+      required:
+        - id
+        - name
+
+    TeamReference:
+      type: object
+      properties:
+        $ref:
+          type: string
+          format: uri
+          description: URL reference to the full team details.
+          example: "http://sports.core.api.espn.com/v2/sports/football/leagues/nfl/teams/17?lang=en&region=us"
+      required:
+        - $ref
+
+    AthleteReference:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "3139477"
+        fullName:
+          type: string
+          example: "Patrick Mahomes"
+        displayName:
+          type: string
+          example: "Patrick Mahomes"
+        headshot:
+          type: string
+          format: uri
+          example: "https://a.espncdn.com/i/headshots/nfl/players/full/3139477.png"
+      required:
+        - id
+        - fullName
+
+    Position:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "9"
+        name:
+          type: string
+          example: "Quarterback"
+        displayName:
+          type: string
+          example: "Quarterback"
+        abbreviation:
+          type: string
+          example: "QB"
+        leaf:
+          type: boolean
+          example: true
+          nullable: true
+        parent:
+          oneOf:
+            - $ref: '#/components/schemas/Position'
+            - $ref: '#/components/schemas/Reference'
+          nullable: true
+
+    StatCategory:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "passingYards"
+        displayName:
+          type: string
+          example: "Passing Yards"
+        value:
+          type: number
+          example: 4183
+        displayValue:
+          type: string
+          example: "4,183"
+        rankDisplayValue:
+          type: string
+          example: "6th in NFL"
+      required:
+        - name
+        - value
+
+    NewsItemDetailed:
+      type: object
+      properties:
+        headline:
+          type: string
+        lastModified:
+          type: string
+          format: date-time
+        root:
+          type: string
+          nullable: true
+        premium:
+          type: boolean
+        links:
+          $ref: '#/components/schemas/NewsLinks'
+        type:
+          type: string
+        section:
+          oneOf:
+            - type: string
+            - $ref: '#/components/schemas/Reference'
+          example: "NFL"
+          nullable: true
+        id:
+          type: integer
+        linkText:
+          type: string
+          nullable: true
+        categorized:
+          type: string
+          format: date-time
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        nowId:
+          type: string
+          nullable: true
+        allowComments:
+          type: boolean
+          nullable: true
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/Image'
+          nullable: true
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsCategory'
+          nullable: true
+        published:
+          type: string
+          format: date-time
+          nullable: true
+        video:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoItem'
+          nullable: true
+        byline:
+          type: string
+          nullable: true
+        dataSourceIdentifier:
+          type: string
+          nullable: true
+        authors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Author'
+          nullable: true
+
+    NewsLinks:
+      type: object
+      properties:
+        api:
+          $ref: '#/components/schemas/SelfLink'
+        mobile:
+          $ref: '#/components/schemas/HrefLink'
+        web:
+          $ref: '#/components/schemas/HrefLink'
+
+    SelfLink:
+      type: object
+      properties:
+        self:
+          $ref: '#/components/schemas/HrefLink'
+
+    HrefLink:
+      type: object
+      properties:
+        href:
+          type: string
+          format: uri
+
+    Image:
+      type: object
+      properties:
+        width:
+          type: integer
+          nullable: true
+        height:
+          type: integer
+          nullable: true
+        url:
+          type: string
+          format: uri
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        alt:
+          type: string
+          nullable: true
+        caption:
+          type: string
+          nullable: true
+        peers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Image'
+          nullable: true
+        source:
+          type: string
+          nullable: true
+
+    NewsCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+        uid:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+        sportId:
+          type: integer
+          nullable: true
+        leagueId:
+          type: integer
+          nullable: true
+        athleteId:
+          type: integer
+          nullable: true
+        teamId:
+          type: integer
+          nullable: true
+        guid:
+          type: string
+          nullable: true
+        athlete:
+          type: object
+          properties:
+            id:
+              type: integer
+            links:
+              type: object
+        team:
+          type: object
+          properties:
+            id:
+              type: integer
+            links:
+              type: object
+        league:
+          type: object
+          properties:
+            id:
+              type: integer
+            abbreviation:
+              type: string
+            links:
+              type: object
+
+    VideoItem:
+      type: object
+      description: Detailed information about a video.
+      properties:
+        source:
+          type: string
+          example: "espn"
+          nullable: true
+        id:
+          type: integer
+          example: 45014514
+        headline:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        caption:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        premium:
+          type: boolean
+          nullable: true
+        ad:
+          $ref: '#/components/schemas/VideoAdDetails'
+          nullable: true
+        tracking:
+          $ref: '#/components/schemas/VideoTrackingDetails'
+          nullable: true
+        cerebroId:
+          type: string
+          nullable: true
+        lastModified:
+          type: string
+          format: date-time
+          nullable: true
+        originalPublishDate:
+          type: string
+          format: date-time
+          nullable: true
+        timeRestrictions:
+          $ref: '#/components/schemas/VideoTimeRestrictions'
+          nullable: true
+        deviceRestrictions:
+          $ref: '#/components/schemas/VideoDeviceRestrictions'
+          nullable: true
+        geoRestrictions:
+          $ref: '#/components/schemas/VideoGeoRestrictions'
+          nullable: true
+        syndicatable:
+          type: boolean
+          nullable: true
+        duration:
+          type: integer
+          nullable: true
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsCategory'
+          nullable: true
+        posterImages:
+          $ref: '#/components/schemas/VideoPosterImages'
+          nullable: true
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/Image'
+          nullable: true
+        thumbnail:
+          type: string
+          format: uri
+          nullable: true
+        links:
+          $ref: '#/components/schemas/VideoLinks'
+          nullable: true
+
+    VideoAdDetails:
+      type: object
+      properties:
+        sport:
+          type: string
+        bundle:
+          type: string
+
+    VideoTrackingDetails:
+      type: object
+      properties:
+        sportName:
+          type: string
+        leagueName:
+          type: string
+        coverageType:
+          type: string
+        trackingName:
+          type: string
+        trackingId:
+          type: string
+
+    VideoTimeRestrictions:
+      type: object
+      properties:
+        embargoDate:
+          type: string
+          format: date-time
+        expirationDate:
+          type: string
+          format: date-time
+
+    VideoDeviceRestrictions:
+      type: object
+      properties:
+        type:
+          type: string
+        devices:
+          type: array
+          items:
+            type: string
+
+    VideoGeoRestrictions:
+      type: object
+      properties:
+        type:
+          type: string
+        countries:
+          type: array
+          items:
+            type: string
+
+    VideoPosterImages:
+      type: object
+      properties:
+        square:
+          $ref: '#/components/schemas/HrefLink'
+        default:
+          $ref: '#/components/schemas/ImageLinkWithSize'
+        wide:
+          $ref: '#/components/schemas/HrefLink'
+        full:
+          $ref: '#/components/schemas/HrefLink'
+
+    ImageLinkWithSize:
+      allOf:
+        - $ref: '#/components/schemas/HrefLink'
+        - type: object
+          properties:
+            width:
+              type: integer
+            height:
+              type: integer
+
+    VideoLinks:
+      type: object
+      properties:
+        sportscenter:
+          $ref: '#/components/schemas/HrefLink'
+        web:
+          $ref: '#/components/schemas/SelfLink'
+        mobile:
+          type: object
+          properties:
+            href:
+              type: string
+              format: uri
+            alert:
+              $ref: '#/components/schemas/HrefLink'
+            progressiveDownload:
+              $ref: '#/components/schemas/HrefLink'
+            source:
+              $ref: '#/components/schemas/HrefLink'
+            streaming:
+              $ref: '#/components/schemas/HrefLink'
+        api:
+          type: object
+          properties:
+            artwork:
+              $ref: '#/components/schemas/HrefLink'
+            self:
+              $ref: '#/components/schemas/HrefLink'
+        source:
+          type: object
+          properties:
+            href:
+              type: string
+              format: uri
+            flash:
+              $ref: '#/components/schemas/HrefLink'
+            full:
+              $ref: '#/components/schemas/HrefLink'
+            hds:
+              $ref: '#/components/schemas/HrefLink'
+            mezzanine:
+              $ref: '#/components/schemas/HrefLink'
+            HD:
+              $ref: '#/components/schemas/HrefLink'
+            HLS:
+              type: object
+              properties:
+                href:
+                  type: string
+                  format: uri
+                HD:
+                  $ref: '#/components/schemas/HrefLink'
+
+    Author:
+      type: object
+      properties:
+        displayName:
+          type: string
+          nullable: true
+        sourceLine:
+          type: string
+          nullable: true
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/Image'
+          nullable: true
+        links:
+          type: object
+          properties:
+            api:
+              $ref: '#/components/schemas/SelfLink'
+          nullable: true
+
+    Season:
+      type: object
+      properties:
+        year:
+          type: integer
+          example: 2023
+        type:
+          type: integer
+          description: Season type (1=preseason, 2=regular, 3=postseason)
+          example: 2
+        displayName:
+          type: string
+          example: "2023 Regular Season"
+        "$ref":
+          type: string
+          format: uri
+          nullable: true
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/Error'
+
+    FlexResponse:
+      type: object
+      required:
+        - columns
+      properties:
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlexColumn'
+          description: Layout columns containing content items
+
+    FlexColumn:
+      type: object
+      required:
+        - name
+        - description
+        - items
+      properties:
+        name:
+          type: string
+          description: Column identifier (e.g., leftcolumn, middlecolumn, rightcolumn)
+        description:
+          type: string
+          description: Human-readable column description
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlexItem'
+          description: Content items in this column
+
+    FlexItem:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: Item type (e.g., contributor-page)
+        contributor:
+          $ref: '#/components/schemas/ContributorInfo'
+        count:
+          type: integer
+          description: Total number of feed items
+        pageSize:
+          type: integer
+          description: Number of items per page
+        cursor:
+          type: string
+          description: Pagination cursor
+        feed:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedItem'
+          description: Array of content feed items
+
+    ContributorInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        ids:
+          $ref: '#/components/schemas/ContributorIds'
+        type:
+          type: string
+        displayName:
+          type: string
+        biography:
+          type: string
+        sourceLine:
+          type: string
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlexImage'
+        social:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialLink'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlexLink'
+
+    ContributorIds:
+      type: object
+      properties:
+        now:
+          type: string
+        cms:
+          type: string
+        slug:
+          type: string
+        guid:
+          type: string
+
+    FeedItem:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          description: Content type (e.g., shortstop)
+        ids:
+          type: object
+          additionalProperties:
+            type: string
+        dates:
+          $ref: '#/components/schemas/FeedItemDates'
+        descriptions:
+          $ref: '#/components/schemas/FeedItemDescriptions'
+        payload:
+          type: string
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlexImage'
+        contributors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContributorInfo'
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedCategory'
+        attributes:
+          type: object
+          additionalProperties:
+            type: object
+        locales:
+          type: array
+          items:
+            type: string
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlexLink'
+
+    FeedItemDates:
+      type: object
+      properties:
+        created:
+          type: string
+          format: date-time
+        modified:
+          type: string
+          format: date-time
+        processed:
+          type: string
+          format: date-time
+
+    FeedItemDescriptions:
+      type: object
+      properties:
+        headline:
+          type: string
+        title:
+          type: string
+
+    FeedCategory:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlexLink'
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlexImage'
+        sport:
+          type: string
+        league:
+          type: string
+        uid:
+          type: string
+        color:
+          type: string
+        alternateColor:
+          type: string
+        subText:
+          type: string
+
+    FlexImage:
+      type: object
+      properties:
+        href:
+          type: string
+          format: uri
+        rels:
+          type: array
+          items:
+            type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        attributes:
+          type: object
+          additionalProperties:
+            type: object
+
+    FlexLink:
+      type: object
+      properties:
+        rels:
+          type: array
+          items:
+            type: string
+        href:
+          type: string
+          format: uri
+        locale:
+          type: string
+
+    SocialLink:
+      type: object
+      properties:
+        label:
+          type: string
+        icon:
+          type: string
+          format: uri
+        href:
+          type: string
+          format: uri
+
+    GolfAthleteStatsResponse:
+      type: object
+      required:
+        - filters
+      properties:
+        filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsFilter'
+          description: Available filters for statistics
+        statistics:
+          $ref: '#/components/schemas/GolfStatistics'
+          description: Golf statistics data
+        glossary:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlossaryEntry'
+          description: Definitions for statistical abbreviations
+        leaguesStats:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: League-specific statistics
+
+    GolfStatistics:
+      type: object
+      required:
+        - displayName
+        - labels
+        - names
+        - displayNames
+        - splits
+      properties:
+        displayName:
+          type: string
+          description: Display name for the statistics set (e.g., "2024 Season Overview")
+        labels:
+          type: array
+          items:
+            type: string
+          description: Short labels for statistics (e.g., "EVENTS", "CUTS")
+        names:
+          type: array
+          items:
+            type: string
+          description: Full names for statistics (e.g., "Tournaments Played")
+        displayNames:
+          type: array
+          items:
+            type: string
+          description: Display names for statistics (e.g., "Tournaments played")
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/GolfStatSplit'
+          description: Statistical splits
+
+    GolfStatSplit:
+      type: object
+      required:
+        - displayName
+        - stats
+      properties:
+        displayName:
+          type: string
+          description: Split display name (e.g., "2024")
+        stats:
+          type: array
+          items:
+            type: string
+          description: Statistical values as strings
+
+    CareerStatistics:
+      type: object
+      properties:
+        displayName:
+          type: string
+          example: "Career Passing"
+        categories:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: "passing"
+              displayName:
+                type: string
+                example: "Passing"
+              count:
+                type: integer
+                example: 9
+            required:
+              - name
+              - displayName
+        labels:
+          type: array
+          items:
+            type: string
+          description: "Labels for the statistics."
+          example: ["CMP", "ATT", "CMP%", "YDS", "AVG", "TD", "INT", "LNG", "RTG"]
+        names:
+          type: array
+          items:
+            type: string
+          description: "Internal names for the statistics."
+          example: ["completions", "passingAttempts", "completionPct", "passingYards", "yardsPerPassAttempt", "passingTouchdowns", "interceptions", "longPassing", "QBRating"]
+        displayNames:
+          type: array
+          items:
+            type: string
+          description: "Display names for the statistics."
+          example: ["Completions", "Passing Attempts", "Completion Percentage", "Passing Yards", "Yards Per Pass Attempt", "Passing Touchdowns", "Interceptions", "Longest Pass", "Passer Rating"]
+        splits:
+          type: array
+          items:
+            type: object
+            properties:
+              displayName:
+                type: string
+                example: "Career"
+              stats:
+                type: array
+                items:
+                  type: string
+                example: ["7753", "12050", "64.3", "89,214", "7.4", "649", "212", "99", "97.2"]
+            required:
+              - displayName
+              - stats
+          description: "Breakdown of statistics by different criteria (e.g., seasons, game types)."
+      required: # Assuming these are generally present based on example
+        - displayName
+        - categories
+        - labels
+        - names
+        - displayNames
+        - splits
+
+    AthleteStatus:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "1"
+        name:
+          type: string
+          example: "Active"
+        type:
+          type: string
+          example: "active"
+        abbreviation:
+          type: string
+          example: "ACT"
+
+    Draft:
+      type: object
+      properties:
+        displayText:
+          type: string
+        round:
+          type: integer
+        year:
+          type: integer
+        selection:
+          type: integer
+        team:
+            $ref: '#/components/schemas/TeamReference'
+
+    Hand:
+      type: object
+      properties:
+        type:
+          type: string
+        abbreviation:
+          type: string
+        displayValue:
+          type: string
+      nullable: true
+
+    Flag:
+        type: object
+        properties:
+            id:
+                type: string
+            text:
+                type: string
+            type:
+                type: string
+        nullable: true
+
+    BirthPlace:
+      type: object
+      properties:
+        city:
+          type: string
+          example: "San Mateo"
+        state:
+          type: string
+          example: "CA"
+          nullable: true
+        country:
+          type: string
+          example: "USA"
+          nullable: true
+
+    College:
+      type: object
+      properties:
+        id:
+          type: string
+        mascot:
+          type: string
+        name:
+          type: string
+        shortName:
+          type: string
+      additionalProperties: true
+
+    Headshot:
+      type: object
+      properties:
+        href:
+          type: string
+          format: uri
+        alt:
+          type: string
+          example: "Tom Brady"
+          nullable: true
+
+    Injury:
+      type: object
+      properties:
+        status:
+          type: string
+        date:
+          type: string
+          format: date-time
+          example: "2023-10-10T00:00:00Z"
+          nullable: true
+        comment:
+          type: string
+          nullable: true
+        detail:
+          type: string
+          nullable: true
+        type:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            abbreviation:
+              type: string
+        details:
+          $ref: '#/components/schemas/Reference'
+
+    Team:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "17"
+        uid:
+          type: string
+          example: "s:20~l:28~t:17"
+        slug:
+          type: string
+          example: "new-england-patriots"
+          nullable: true
+        abbreviation:
+          type: string
+          example: "NE"
+        displayName:
+          type: string
+          example: "New England Patriots"
+        shortDisplayName:
+          type: string
+          example: "Patriots"
+          nullable: true
+        name:
+          type: string
+          example: "Patriots"
+          nullable: true
+        nickname:
+          type: string
+          example: "Patriots"
+          nullable: true
+        location:
+          type: string
+          example: "New England"
+        color:
+          type: string
+          example: "002244"
+          nullable: true
+        alternateColor:
+          type: string
+          example: "c60c30"
+          nullable: true
+        isActive:
+          type: boolean
+          example: true
+        isAllStar:
+          type: boolean
+          example: false
+          nullable: true
+        logos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Logo'
+          nullable: true
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+          nullable: true
+        group:
+          $ref: '#/components/schemas/Reference'
+          nullable: true
+        seasonSummary:
+          type: string
+          nullable: true
+        clubhouse:
+          type: string
+          format: uri
+          nullable: true
+        logo:
+          type: string
+          format: uri
+          nullable: true
+
+    Logo:
+      type: object
+      properties:
+        href:
+          type: string
+          format: uri
+        width:
+          type: integer
+          nullable: true
+        height:
+          type: integer
+          nullable: true
+        alt:
+          type: string
+          nullable: true
+        rel:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    Experience:
+      type: object
+      properties:
+        years:
+          type: integer
+          example: 23
+
+    Status:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "1"
+        name:
+          type: string
+          example: "Active"
+        type:
+          type: string
+          example: "active"
+        abbreviation:
+          type: string
+          example: "ACT"
+
+    Note:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        text:
+          type: string
+
+    Link:
+      type: object
+      properties:
+        language:
+          type: string
+          example: "en-US"
+        rel:
+          type: array
+          items:
+            type: string
+          example: ["desktop", "athlete"]
+        href:
+          type: string
+          format: uri
+        text:
+          type: string
+        shortText:
+          type: string
+          nullable: true
+        isExternal:
+          type: boolean
+        isPremium:
+          type: boolean
+        attributes:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    ImageLink:
+        type: object
+        properties:
+            href:
+                type: string
+                format: uri
+            width:
+                type: integer
+            height:
+                type: integer
+            alt:
+                type: string
+            rel:
+                type: array
+                items:
+                    type: string
+
+    SearchV2Response:
+      type: object
+      properties:
+        totalFound:
+          type: integer
+          description: Total number of results found
+        resultTypes:
+          type: array
+          description: List of result type summaries
+          items:
+            $ref: '#/components/schemas/SearchV2ResultType'
+        results:
+          type: array
+          description: List of grouped search results
+          items:
+            $ref: '#/components/schemas/SearchV2ResultGroup'
+      required:
+        - totalFound
+        - resultTypes
+        - results
+
+    SearchV2ResultType:
+      type: object
+      properties:
+        totalFound:
+          type: integer
+        type:
+          type: string
+        displayName:
+          type: string
+      required:
+        - totalFound
+        - type
+        - displayName
+
+    SearchV2ResultGroup:
+      type: object
+      properties:
+        type:
+          type: string
+        totalFound:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        displayName:
+          type: string
+        contents:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchV2ContentItem'
+      required:
+        - type
+        - totalFound
+        - page
+        - limit
+        - displayName
+        - contents
+
+    SearchV2ContentItem:
+      type: object
+      properties:
+        id:
+          type: string
+        uid:
+          type: string
+          nullable: true
+        guid:
+          type: string
+          nullable: true
+        type:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+          nullable: true
+        subtitle:
+          type: string
+          nullable: true
+        link:
+          type: object
+          properties:
+            app:
+              type: string
+              nullable: true
+            web:
+              type: string
+              nullable: true
+        image:
+          type: object
+          properties:
+            default:
+              type: string
+              format: uri
+              nullable: true
+            defaultDark:
+              type: string
+              format: uri
+              nullable: true
+          nullable: true
+        images:
+          type: array
+          items:
+            type: object
+          nullable: true
+        defaultLeagueSlug:
+          type: string
+          nullable: true
+        sport:
+          type: string
+          nullable: true
+        byline:
+          type: string
+          nullable: true
+        date:
+          type: string
+          format: date-time
+          nullable: true
+        isPremium:
+          type: boolean
+          nullable: true
+        categories:
+          type: array
+          items:
+            type: object
+          nullable: true
+        nowId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+      required:
+        - id
+        - type
+        - displayName
+        - link
+
+    AthleteSplitsResponse:
+      type: object
+      properties:
+        filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/AthleteSplitsFilter'
+        displayName:
+          type: string
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/AthleteSplitsCategory'
+        labels:
+          type: array
+          items:
+            type: string
+        names:
+          type: array
+          items:
+            type: string
+        displayNames:
+          type: array
+          items:
+            type: string
+        descriptions:
+          type: array
+          items:
+            type: string
+        splitCategories:
+          type: array
+          items:
+            $ref: '#/components/schemas/AthleteSplitsSplitCategory'
+      required:
+        - filters
+        - displayName
+        - categories
+        - labels
+        - names
+        - displayNames
+        - descriptions
+        - splitCategories
+      description: NFL Athlete Splits response object.
+
+    AthleteSplitsCategory:
+      type: object
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        count:
+          type: integer
+      required:
+        - name
+        - displayName
+        - count
+      description: Category in NFL Athlete Splits response.
+
+    AthleteSplitsFilter:
+      type: object
+      properties:
+        displayName:
+          type: string
+        name:
+          type: string
+        value:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/AthleteSplitsOption'
+      required:
+        - displayName
+        - name
+        - value
+        - options
+      description: Filter in NFL Athlete Splits response.
+
+    AthleteSplitsOption:
+      type: object
+      properties:
+        value:
+          type: string
+        displayValue:
+          type: string
+        shortDisplayName:
+          type: string
+          nullable: true
+      required:
+        - value
+        - displayValue
+      description: Option in NFL Athlete Splits filter.
+
+    AthleteSplitsSplitCategory:
+      type: object
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/AthleteSplitsSplit'
+          nullable: true
+      required:
+        - name
+        - displayName
+      description: Split category in NFL Athlete Splits response.
+
+    AthleteSplitsSplit:
+      type: object
+      properties:
+        displayName:
+          type: string
+        stats:
+          type: array
+          items:
+            type: string
+        abbreviation:
+          type: string
+      required:
+        - displayName
+        - stats
+        - abbreviation
+      description: Split in NFL Athlete Splits response.
+
+    AthleteProfileResponse:
+      type: object
+      properties:
+        athlete:
+          type: object
+          properties:
+            id:
+              type: string
+            uid:
+              type: string
+            guid:
+              type: string
+            type:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+            displayName:
+              type: string
+            fullName:
+              type: string
+            jersey:
+              type: string
+            position:
+              $ref: '#/components/schemas/Position'
+            age:
+              type: integer
+            displayHeight:
+              type: string
+            displayWeight:
+              type: string
+            college:
+              type: object
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                abbrev:
+                  type: string
+            team:
+              $ref: '#/components/schemas/Team'
+            headshot:
+              $ref: '#/components/schemas/Headshot'
+            status:
+              $ref: '#/components/schemas/Status'
+          required:
+            - id
+            - uid
+            - guid
+            - type
+            - firstName
+            - lastName
+            - displayName
+            - fullName
+            - jersey
+            - position
+            - age
+            - displayHeight
+            - displayWeight
+            - college
+            - team
+            - headshot
+            - status
+      required:
+        - athlete
+
+    SportEnum:
+      type: string
+      description: Common sport identifiers used in ESPN APIs.
+      enum:
+        - football
+        - basketball
+        - baseball
+        - hockey
+        - soccer
+        - golf
+        - racing
+        - tennis
+    LeagueEnum:
+      type: string
+      description: Common league identifiers used in ESPN APIs.
+      enum:
+        - nfl
+        - mlb
+        - nba
+        - nhl
+        - wnba
+        - mens-college-basketball
+        - womens-college-basketball
+        - college-football
+        - college-baseball
+        - pga
+        - lpga
+        - f1
+        - nascar-premier
+        - atp
+        - wta
+        - mls
+        - epl
+        - laliga
+        - bundesliga
+        - serie-a
+        - ligue-1
+        - ucl
+        - europa-league
+        - other
+    
+    MlbStatisticName:
+      type: string
+      description: Statistic name identifiers used in MLB API responses
+      enum:
+        - avg
+        - obp
+        - slg
+        - ops
+        - rbi
+        - homeRuns
+        - runs
+        - hits
+        - atBats
+        - doubles
+        - triples
+        - stolenBases
+        - battingAverage
+        - strikeouts
+        - walks
+        - plateAppearances
+        - onBasePercentage
+        - sluggingPercentage
+        - onBasePlusSlugging
+        - totalBases
+        - earnedRunAverage
+        - wins
+        - losses
+        - saves
+        - blownSaves
+        - holds
+        - inningsPitched
+        - walksPlusHitsPerInningPitched
+        - hitsAllowed
+        - walksAllowed
+        - strikeoutsPitching
+        - runsPitching
+        - earnedRuns
+        - homersPitching
+        - fieldingPercentage
+        - putouts
+        - assists
+        - errors
+        - totalChances
+        - battingAverageAgainst
+        - saveOpportunities
+        - gamesPlayed
+        - gamesBatting
+        - gamesPitching
+        - gamesFielding
+        - gamesStarted
+        - completeGames
+        - shutouts
+        - hitBatsmen
+        - wildPitches
+        - pickoffs
+        - groundIntoDoublePlays
+        - sacrificeBunts
+        - sacrificeFlies
+        - intentionalWalks
+        - leftOnBase
+        - winPercentage
+
+    MLBAthleteDetailsResponse:
+      type: object
+      required:
+        - athlete
+        - league
+        - links
+        - playerSwitcher
+        - quicklinks
+        - season
+        - standings
+        - ticketsInfo
+      properties:
+        athlete:
+          $ref: '#/components/schemas/MLBAthleteDetailsAthlete'
+        season:
+          type: object
+          additionalProperties: true
+        league:
+          type: object
+          additionalProperties: true
+        playerSwitcher:
+          type: object
+          additionalProperties: true
+        quicklinks:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        ticketsInfo:
+          type: object
+          additionalProperties: true
+        standings:
+          type: object
+          additionalProperties: true
+      description: MLB athlete details response from site.web.api.espn.com
+
+    MLBAthleteDetailsAthlete:
+      type: object
+      required:
+        - active
+        - age
+        - college
+        - debutYear
+        - displayBatsThrows
+        - displayBirthPlace
+        - displayDOB
+        - displayDraft
+        - displayExperience
+        - displayHeight
+        - displayJersey
+        - displayName
+        - displayWeight
+        - firstName
+        - fullName
+        - guid
+        - headshot
+        - id
+        - jersey
+        - lastName
+        - links
+        - position
+        - statsSummary
+        - status
+        - team
+        - type
+        - uid
+      properties:
+        id:
+          type: string
+        uid:
+          type: string
+        guid:
+          type: string
+        type:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        displayName:
+          type: string
+        fullName:
+          type: string
+        debutYear:
+          type: integer
+        jersey:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        college:
+          type: object
+          additionalProperties: true
+        headshot:
+          type: object
+          additionalProperties: true
+        position:
+          type: object
+          additionalProperties: true
+        team:
+          type: object
+          additionalProperties: true
+        active:
+          type: boolean
+        status:
+          type: object
+          additionalProperties: true
+        statsSummary:
+          type: object
+          additionalProperties: true
+        displayBirthPlace:
+          type: string
+        displayHeight:
+          type: string
+        displayWeight:
+          type: string
+        displayDOB:
+          type: string
+        age:
+          type: integer
+        displayJersey:
+          type: string
+        displayExperience:
+          type: string
+        displayDraft:
+          type: string
+        displayBatsThrows:
+          type: string
+      description: MLB athlete details (athlete object) from site.web.api.espn.com
+
+    SeasonInfoResponse:
+      type: object
+      required:
+        - year
+        - displayName
+        - startDate
+        - endDate
+        - types
+      properties:
+        year:
+          type: integer
+          description: The season year
+          example: 2024
+        displayName:
+          type: string
+          description: Display name for the season
+          example: "2024"
+        startDate:
+          type: string
+          format: date-time
+          description: Season start date in ISO 8601 format
+          example: "2024-08-01T07:00:00.000+00:00"
+        endDate:
+          type: string
+          format: date-time
+          description: Season end date in ISO 8601 format
+          example: "2025-02-15T07:59:00.000+00:00"
+        types:
+          type: array
+          description: Array of season types (preseason, regular, postseason, etc.)
+          items:
+            $ref: '#/components/schemas/SeasonTypeInfo'
+      description: Season information response from site.web.api.espn.com
+
+    SeasonTypeInfo:
+      type: object
+      required:
+        - id
+        - type
+        - name
+        - startDate
+        - endDate
+      properties:
+        id:
+          type: string
+          description: Season type ID as string
+          example: "1"
+        type:
+          type: integer
+          description: Season type as integer (1=preseason, 2=regular, 3=postseason, 4=offseason, 5=play-in)
+          example: 1
+        name:
+          type: string
+          description: Name of the season type
+          example: "Preseason"
+        startDate:
+          type: string
+          format: date-time
+          description: Season type start date in ISO 8601 format
+          example: "2024-08-01T07:00:00.000+00:00"
+        endDate:
+          type: string
+          format: date-time
+          description: Season type end date in ISO 8601 format
+          example: "2024-09-05T06:59:00.000+00:00"
+      description: Season type information (e.g., preseason, regular season, postseason)
+
+    LeadersResponse:
+      type: object
+      required:
+        - currentSeason
+        - requestedSeason
+        - leaders
+        - league
+      properties:
+        currentSeason:
+          $ref: '#/components/schemas/LeadersSeason'
+        requestedSeason:
+          $ref: '#/components/schemas/LeadersSeason'
+        leaders:
+          $ref: '#/components/schemas/LeadersContainer'
+        league:
+          $ref: '#/components/schemas/LeadersLeague'
+      description: Response containing statistical leaders for a sport/league
+
+    LeadersSeason:
+      type: object
+      required:
+        - year
+        - displayName
+        - startDate
+        - endDate
+        - type
+      properties:
+        year:
+          type: integer
+          description: The season year
+        displayName:
+          type: string
+          description: Display name for the season (usually the year as string)
+        startDate:
+          type: string
+          format: date-time
+          description: Season start date
+        endDate:
+          type: string
+          format: date-time
+          description: Season end date
+        type:
+          $ref: '#/components/schemas/LeadersSeasonType'
+
+    LeadersSeasonType:
+      type: object
+      required:
+        - id
+        - type
+        - name
+        - startDate
+        - endDate
+      properties:
+        id:
+          type: string
+          description: Season type ID
+        type:
+          type: integer
+          description: Season type number
+        name:
+          type: string
+          description: Season type name (e.g., "Off Season", "Regular Season")
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        week:
+          type: object
+          description: Week information (may be empty)
+
+    LeadersContainer:
+      type: object
+      required:
+        - id
+        - name
+        - abbreviation
+        - categories
+      properties:
+        id:
+          type: string
+          description: Leaders container ID
+        name:
+          type: string
+          description: Leaders container name
+        abbreviation:
+          type: string
+          description: Leaders container abbreviation
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderCategory'
+
+    LeaderCategory:
+      type: object
+      required:
+        - name
+        - displayName
+        - abbreviation
+        - leaders
+      properties:
+        name:
+          type: string
+          description: Category name (e.g., "passingYards")
+        displayName:
+          type: string
+          description: Display name (e.g., "Passing Yards")
+        abbreviation:
+          type: string
+          description: Category abbreviation (e.g., "YDS")
+        leaders:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderEntry'
+
+    LeaderEntry:
+      type: object
+      required:
+        - displayValue
+        - value
+        - athlete
+      properties:
+        displayValue:
+          type: string
+          description: Formatted display value of the statistic
+        value:
+          type: number
+          description: Numeric value of the statistic
+        rel:
+          type: array
+          items:
+            type: string
+          description: Relationship types
+        athlete:
+          $ref: '#/components/schemas/LeaderAthlete'
+        statistics:
+          type: object
+          description: Additional statistics (may be empty)
+        team:
+          $ref: '#/components/schemas/LeaderTeam'
+        teams:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderTeam'
+
+    LeaderAthlete:
+      type: object
+      required:
+        - id
+        - displayName
+      properties:
+        id:
+          type: string
+          description: Athlete ID
+        uid:
+          type: string
+          description: Unique identifier
+        guid:
+          type: string
+          description: Global unique identifier
+        firstName:
+          type: string
+          description: First name
+        lastName:
+          type: string
+          description: Last name
+        displayName:
+          type: string
+          description: Display name
+        fullName:
+          type: string
+          description: Full name
+        shortName:
+          type: string
+          description: Short name
+        jersey:
+          type: string
+          description: Jersey number
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        headshot:
+          $ref: '#/components/schemas/Headshot'
+        position:
+          $ref: '#/components/schemas/Position'
+        birthPlace:
+          $ref: '#/components/schemas/BirthPlace'
+
+    LeaderTeam:
+      type: object
+      required:
+        - id
+        - displayName
+      properties:
+        id:
+          type: string
+          description: Team ID
+        slug:
+          type: string
+          description: URL slug
+        name:
+          type: string
+          description: Team name
+        nickname:
+          type: string
+          description: Team nickname
+        abbreviation:
+          type: string
+          description: Team abbreviation
+        displayName:
+          type: string
+          description: Full team display name
+        shortDisplayName:
+          type: string
+          description: Short display name
+        color:
+          type: string
+          description: Primary team color (hex)
+        alternateColor:
+          type: string
+          description: Alternate team color (hex)
+        logos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Logo'
+          description: Team logos
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+          description: Related links
+
+    AthleteBioResponse:
+      type: object
+      properties:
+        teamHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamHistoryEntry'
+          description: History of teams the athlete has played for
+        awards:
+          type: array
+          items:
+            $ref: '#/components/schemas/AwardEntry'
+          description: Awards and achievements (optional, not all athletes have awards)
+      description: Athlete biographical information response
+
+    TeamHistoryEntry:
+      type: object
+      required:
+        - id
+        - displayName
+        - seasons
+      properties:
+        id:
+          type: string
+          description: Team ID
+        uid:
+          type: string
+          description: Unique identifier
+        slug:
+          type: string
+          description: URL slug
+        displayName:
+          type: string
+          description: Full team name
+        logo:
+          type: string
+          description: Team logo URL
+        seasons:
+          type: string
+          description: Seasons played (e.g., "2017-CURRENT" or "2015-2017")
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        seasonCount:
+          type: string
+          description: Number of seasons with team
+        isActive:
+          type: boolean
+          description: Whether currently on this team
+
+    AwardEntry:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          description: Award ID
+        league:
+          type: string
+          description: League abbreviation
+        name:
+          type: string
+          description: Award name
+        displayCount:
+          type: string
+          description: Display string for count (e.g., "4x")
+        seasons:
+          type: array
+          items:
+            type: integer
+          description: Years won
+
+    AthleteStatsResponse:
+      type: object
+      required:
+        - filters
+        - teams
+        - categories
+        - glossary
+      properties:
+        filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsFilter'
+          description: Available filters for statistics
+        teams:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/StatsTeam'
+          description: Teams the athlete has played for
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsCategory'
+          description: Statistical categories
+        glossary:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlossaryEntry'
+          description: Definitions for abbreviations
+
+    StatsFilter:
+      type: object
+      required:
+        - displayName
+        - name
+        - value
+        - options
+      properties:
+        displayName:
+          type: string
+          description: Display name for filter
+        name:
+          type: string
+          description: Filter parameter name
+        value:
+          type: string
+          description: Current filter value
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterOption'
+
+    FilterOption:
+      type: object
+      required:
+        - value
+        - displayValue
+      properties:
+        value:
+          type: string
+          description: Option value
+        displayValue:
+          type: string
+          description: Display text
+        shortDisplayName:
+          type: string
+          description: Short display name
+
+    StatsTeam:
+      type: object
+      required:
+        - id
+        - displayName
+      properties:
+        id:
+          type: string
+          description: Team ID
+        uid:
+          type: string
+          description: Unique identifier
+        guid:
+          type: string
+          description: Global unique identifier
+        slug:
+          type: string
+          description: URL slug
+        location:
+          type: string
+          description: Team location
+        name:
+          type: string
+          description: Team name
+        nickname:
+          type: string
+          description: Team nickname
+        abbreviation:
+          type: string
+          description: Team abbreviation
+        displayName:
+          type: string
+          description: Full team name
+        shortDisplayName:
+          type: string
+          description: Short display name
+        color:
+          type: string
+          description: Primary team color
+        alternateColor:
+          type: string
+          description: Alternate team color
+        isActive:
+          type: boolean
+          description: Whether team is active
+        isAllStar:
+          type: boolean
+          description: Whether this is an all-star team
+        logos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Logo'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        venue:
+          $ref: '#/components/schemas/StatsVenue'
+        record:
+          type: object
+          description: Team record
+        againstTheSpreadRecords:
+          type: object
+          description: ATS records
+        ranks:
+          type: object
+          description: Team rankings
+        franchise:
+          type: object
+          description: Franchise information
+        coaches:
+          type: object
+          description: Coaching staff
+        groups:
+          type: object
+          description: Groups/divisions
+
+    StatsVenue:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Venue ID
+        fullName:
+          type: string
+          description: Full venue name
+        address:
+          $ref: '#/components/schemas/Address'
+        grass:
+          type: boolean
+          description: Whether field is grass
+        indoor:
+          type: boolean
+          description: Whether venue is indoor
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageLink'
+
+    StatsCategory:
+      type: object
+      required:
+        - name
+        - displayName
+        - labels
+        - statistics
+      properties:
+        name:
+          type: string
+          description: Category name
+        displayName:
+          type: string
+          description: Display name
+        labels:
+          type: array
+          items:
+            type: string
+          description: Column labels
+        names:
+          type: array
+          items:
+            type: string
+          description: Field names
+        displayNames:
+          type: array
+          items:
+            type: string
+          description: Field display names
+        descriptions:
+          type: array
+          items:
+            type: string
+          description: Field descriptions
+        statistics:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeasonStatistics'
+        totals:
+          type: array
+          items:
+            type: string
+          description: Career totals
+        sortKey:
+          type: string
+          description: Sort key for category
+
+    SeasonStatistics:
+      type: object
+      required:
+        - teamId
+        - season
+        - stats
+      properties:
+        teamId:
+          type: string
+          description: Team ID
+        teamSlug:
+          type: string
+          description: Team slug
+        season:
+          $ref: '#/components/schemas/StatsSeason'
+        stats:
+          type: array
+          items:
+            type: string
+          description: Statistical values
+        position:
+          type: string
+          description: Player position
+        seasonTotals:
+          type: array
+          items:
+            type: string
+          description: Season totals
+
+    StatsSeason:
+      type: object
+      required:
+        - year
+        - displayName
+      properties:
+        year:
+          type: integer
+          description: Season year
+        displayName:
+          type: string
+          description: Display name
+
+    GlossaryEntry:
+      type: object
+      required:
+        - abbreviation
+        - displayName
+      properties:
+        abbreviation:
+          type: string
+          description: Statistical abbreviation
+        displayName:
+          type: string
+          description: Full description
+
+    LeadersLeague:
+      type: object
+      properties:
+        id:
+          type: string
+          description: League ID
+        name:
+          type: string
+          description: League name
+        abbreviation:
+          type: string
+          description: League abbreviation
+        displayName:
+          type: string
+          description: League display name
+        slug:
+          type: string
+          description: URL slug
+
+    TeamLeadersResponse:
+      type: object
+      required:
+        - currentSeason
+        - requestedSeason
+        - teamLeaders
+      properties:
+        currentSeason:
+          $ref: '#/components/schemas/TeamLeadersSeason'
+        requestedSeason:
+          $ref: '#/components/schemas/TeamLeadersSeason'
+        teamLeaders:
+          $ref: '#/components/schemas/TeamLeadersContainer'
+      description: Response containing team leaders for various statistical categories
+
+    TeamLeadersSeason:
+      type: object
+      required:
+        - year
+        - displayName
+        - startDate
+        - endDate
+        - type
+      properties:
+        year:
+          type: integer
+          description: The season year
+        displayName:
+          type: string
+          description: Display name for the season
+        startDate:
+          type: string
+          format: date-time
+          description: Season start date
+        endDate:
+          type: string
+          format: date-time
+          description: Season end date
+        type:
+          $ref: '#/components/schemas/TeamLeadersSeasonType'
+
+    TeamLeadersSeasonType:
+      type: object
+      required:
+        - id
+        - type
+        - name
+      properties:
+        id:
+          type: string
+          description: Season type ID
+        type:
+          type: integer
+          description: Season type number
+        name:
+          type: string
+          description: Season type name (e.g., "Regular Season", "Off Season")
+        startDate:
+          type: string
+          format: date-time
+          description: Season type start date
+        endDate:
+          type: string
+          format: date-time
+          description: Season type end date
+        week:
+          type: object
+          description: Current week information
+
+    TeamLeadersContainer:
+      type: object
+      required:
+        - abbreviation
+        - id
+        - name
+        - categories
+      properties:
+        abbreviation:
+          type: string
+          description: Abbreviation for the leaders container (e.g., "Total")
+        id:
+          type: string
+          description: ID for the leaders container
+        name:
+          type: string
+          description: Name of the leaders container
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamLeaderCategory'
+          description: Array of statistical categories
+
+    TeamLeaderCategory:
+      type: object
+      required:
+        - displayName
+        - name
+        - abbreviation
+        - leaders
+      properties:
+        displayName:
+          type: string
+          description: Display name for the category
+        name:
+          type: string
+          description: Internal name for the category
+        abbreviation:
+          type: string
+          description: Abbreviation for the category
+        leaders:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamLeaderEntry'
+          description: Array of team leaders for this category
+
+    TeamLeaderEntry:
+      type: object
+      required:
+        - displayValue
+        - value
+        - team
+      properties:
+        displayValue:
+          type: string
+          description: Display value for the statistic
+        value:
+          type: number
+          description: Numeric value for the statistic
+        ranks:
+          type: string
+          description: Team's rank for this statistic
+        team:
+          $ref: '#/components/schemas/TeamLeaderTeam'
+
+    TeamLeaderTeam:
+      type: object
+      required:
+        - id
+        - uid
+        - name
+        - abbreviation
+        - displayName
+        - shortDisplayName
+      properties:
+        id:
+          type: string
+          description: Team ID
+        uid:
+          type: string
+          description: Unique identifier for the team
+        guid:
+          type: string
+          description: Global unique identifier
+        name:
+          type: string
+          description: Team name
+        nickname:
+          type: string
+          description: Team nickname
+        abbreviation:
+          type: string
+          description: Team abbreviation
+        displayName:
+          type: string
+          description: Full display name
+        shortDisplayName:
+          type: string
+          description: Short display name
+        logos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Logo'
+          description: Array of team logos
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+          description: Array of related links
+        slug:
+          type: string
+          description: URL slug for the team
+        group:
+          type: object
+          description: Team group information
+        ranks:
+          type: object
+          description: Team ranking information
+
+    Address:
+        type: object
+        properties:
+          city:
+            type: string
+            example: "Los Angeles"
+          state:
+            type: string
+            example: "CA"
+          zipCode:
+            type: string
+            example: "90037"
+          country:
+            type: string
+            example: "USA"
+
+    FantasyGamesResponse:
+      type: object
+      required:
+        - events
+        - statistics
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/FantasyGameEvent'
+        statistics:
+          type: array
+          items:
+            $ref: '#/components/schemas/FantasyStatistic'
+
+    FantasyGameEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Event ID
+        competitionId:
+          type: string
+          description: Competition ID
+        uid:
+          type: string
+          description: Unique identifier
+        date:
+          type: string
+          format: date-time
+          description: Game date and time
+        timeValid:
+          type: boolean
+          description: Whether the time is confirmed
+        period:
+          type: integer
+          description: Current period/quarter
+        clock:
+          type: string
+          description: Game clock
+        status:
+          type: string
+          description: Game status (pre, in, post, etc.)
+        summary:
+          type: string
+          description: Game summary text
+        fullStatus:
+          $ref: '#/components/schemas/FantasyFullStatus'
+        competitors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FantasyCompetitor'
+        venue:
+          $ref: '#/components/schemas/FantasyVenue'
+        weather:
+          $ref: '#/components/schemas/FantasyWeather'
+        broadcasts:
+          type: array
+          items:
+            $ref: '#/components/schemas/FantasyBroadcast'
+        links:
+          type: array
+          items:
+            type: object
+            description: Link information
+        odds:
+          type: object
+          description: Odds information
+        againstTheSpread:
+          type: object
+          description: Against the spread information
+        pickcenter:
+          type: array
+          items:
+            type: object
+            description: Pickcenter information
+        scoringPlays:
+          type: array
+          items:
+            type: object
+            description: Scoring play information
+        percentComplete:
+          type: integer
+          description: Percentage of game completed
+        lastPlay:
+          type: object
+          description: Last play information
+        drive:
+          type: object
+          description: Current drive information
+        broadcast:
+          type: string
+          description: Broadcast information
+        link:
+          type: string
+          format: uri
+          description: Link to game
+
+
+    FantasyBroadcast:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Broadcast type (TV, Streaming, etc.)
+        lang:
+          type: string
+          description: Language code
+        region:
+          type: string
+          description: Region code
+        typeId:
+          type: integer
+          description: Type ID
+        isNational:
+          type: boolean
+          description: Whether broadcast is national
+        shortName:
+          type: string
+          description: Broadcast network short name
+
+    FantasyOdds:
+      type: object
+      properties:
+        details:
+          type: string
+        overUnder:
+          type: number
+        spread:
+          type: number
+        overOdds:
+          type: number
+        underOdds:
+          type: number
+        provider:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            priority:
+              type: integer
+        homeTeamOdds:
+          type: object
+          properties:
+            favorite:
+              type: boolean
+            underdog:
+              type: boolean
+            team:
+              type: object
+              properties:
+                id:
+                  type: string
+                abbreviation:
+                  type: string
+            currentLine:
+              type: object
+              properties:
+                spreadOdds:
+                  type: number
+                moneyLine:
+                  type: number
+                teamScore:
+                  type: object
+                  properties:
+                    pointSpread:
+                      type: number
+
+    FantasyAgainstTheSpread:
+      type: object
+      properties:
+        team:
+          type: object
+          properties:
+            id:
+              type: string
+            abbreviation:
+              type: string
+        currentLine:
+          type: object
+          properties:
+            spreadOdds:
+              type: number
+            teamScore:
+              type: object
+              properties:
+                pointSpread:
+                  type: number
+
+    FantasyPickcenter:
+      type: object
+      properties:
+        id:
+          type: string
+        homeTeamOdds:
+          type: object
+          properties:
+            spreadOdds:
+              type: number
+            teamScore:
+              type: object
+              properties:
+                pointSpread:
+                  type: number
+        awayTeamOdds:
+          type: object
+          properties:
+            spreadOdds:
+              type: number
+            teamScore:
+              type: object
+              properties:
+                pointSpread:
+                  type: number
+        provider:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            priority:
+              type: integer
+        details:
+          type: string
+        overUnder:
+          type: number
+        spread:
+          type: number
+
+    FantasyScoringPlay:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: object
+          properties:
+            id:
+              type: string
+            text:
+              type: string
+            abbreviation:
+              type: string
+        text:
+          type: string
+        awayScore:
+          type: integer
+        homeScore:
+          type: integer
+        period:
+          type: object
+          properties:
+            number:
+              type: integer
+            displayValue:
+              type: string
+        scoringType:
+          type: object
+          properties:
+            name:
+              type: string
+            displayName:
+              type: string
+            abbreviation:
+              type: string
+        clock:
+          type: object
+          properties:
+            displayValue:
+              type: string
+        team:
+          type: object
+          properties:
+            id:
+              type: string
+        participants:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              athlete:
+                type: object
+                properties:
+                  id:
+                    type: string
+
+    FantasyStatistic:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        abbreviation:
+          type: string
+        type:
+          type: string
+        recipientType:
+          type: string
+        slug:
+          type: string
+
+    FantasyFullStatus:
+      type: object
+      properties:
+        clock:
+          type: string
+        displayClock:
+          type: string
+        period:
+          type: integer
+        type:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            state:
+              type: string
+            completed:
+              type: boolean
+            description:
+              type: string
+            detail:
+              type: string
+            shortDetail:
+              type: string
+
+    FantasyCompetitor:
+      type: object
+      properties:
+        id:
+          type: string
+        uid:
+          type: string
+        homeAway:
+          type: string
+          enum: ["home", "away"]
+        winner:
+          type: boolean
+        name:
+          type: string
+        abbreviation:
+          type: string
+        displayName:
+          type: string
+        logo:
+          type: string
+        score:
+          type: string
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              summary:
+                type: string
+        leaders:
+          type: array
+          items:
+            $ref: '#/components/schemas/FantasyLeader'
+        probables:
+          type: array
+          items:
+            $ref: '#/components/schemas/FantasyProbable'
+
+    FantasyLeader:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        displayValue:
+          type: string
+        leaders:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              value:
+                type: string
+              displayValue:
+                type: string
+              athlete:
+                $ref: '#/components/schemas/FantasyAthlete'
+
+    FantasyAthlete:
+      type: object
+      properties:
+        id:
+          type: string
+        uid:
+          type: string
+        guid:
+          type: string
+        lastName:
+          type: string
+        fullName:
+          type: string
+        displayName:
+          type: string
+        shortName:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        headshot:
+          type: object
+          properties:
+            href:
+              type: string
+            alt:
+              type: string
+        jersey:
+          type: string
+        position:
+          type: object
+          properties:
+            id:
+              type: string
+            abbreviation:
+              type: string
+
+    FantasyProbable:
+      type: object
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        abbreviation:
+          type: string
+        playerId:
+          type: integer
+        athlete:
+          $ref: '#/components/schemas/FantasyAthlete'
+        status:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            type:
+              type: string
+            abbreviation:
+              type: string
+        statistics:
+          type: array
+          items:
+            type: object
+
+    FantasyVenue:
+      type: object
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        address:
+          type: object
+          properties:
+            city:
+              type: string
+            state:
+              type: string
+            zipCode:
+              type: string
+        capacity:
+          type: integer
+        grass:
+          type: boolean
+        indoor:
+          type: boolean
+
+    FantasyWeather:
+      type: object
+      properties:
+        displayValue:
+          type: string
+        highTemperature:
+          type: integer
+        conditionId:
+          type: string
+        link:
+          type: object
+          properties:
+            text:
+              type: string
+            href:
+              type: string
+            isExternal:
+              type: boolean
