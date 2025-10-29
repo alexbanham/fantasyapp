@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 type NodeJSTimeout = ReturnType<typeof setInterval>
 import { Clock, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronUp, Play, Pause, Trophy, MapPin, Calendar } from 'lucide-react'
@@ -70,7 +70,7 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
   const [loadingScorers, setLoadingScorers] = useState<Set<string>>(new Set())
   const expandedGamesRef = useRef<Set<string>>(new Set())
 
-  const fetchTopScorers = async (gameId: string, forceRefresh = false) => {
+  const fetchTopScorers = useCallback(async (gameId: string, forceRefresh = false) => {
     // Don't fetch if already loading, unless forcing refresh
     if (loadingScorers.has(gameId) && !forceRefresh) {
       return
@@ -79,7 +79,8 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
     setLoadingScorers(prev => new Set(prev).add(gameId))
 
     try {
-      const response = await fetch(`/api/live/${gameId}/scorers?limit=10`)
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+      const response = await fetch(`${API_BASE}/live/${gameId}/scorers?limit=10`)
       const data = await response.json()
       
       if (data.success) {
@@ -96,21 +97,23 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
         return newSet
       })
     }
-  }
+  }, [loadingScorers])
 
   // Poll for live games
   useEffect(() => {
     const fetchLiveGames = async () => {
       try {
-        const response = await fetch('/api/live?live_only=true')
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+        const response = await fetch(`${API_BASE}/live?live_only=true`)
         const data = await response.json()
         
         if (data.success) {
           const newGames = data.games || []
           
           // Check for score changes and trigger animations
-          newGames.forEach((newGame: Game) => {
-            const oldGame = games.find(g => g.eventId === newGame.eventId)
+          setGames(prevGames => {
+            newGames.forEach((newGame: Game) => {
+              const oldGame = prevGames.find(g => g.eventId === newGame.eventId)
             if (oldGame) {
               if (oldGame.awayTeam.score !== newGame.awayTeam.score) {
                 setScoreAnimations(prev => new Map(prev.set(newGame.eventId, { 
@@ -137,9 +140,11 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
                 }, 1000)
               }
             }
+            })
+            
+            return newGames
           })
           
-          setGames(newGames)
           setLastUpdated(new Date())
           setError(null)
           setIsOnline(true)
@@ -173,7 +178,7 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
         clearInterval(interval)
       }
     }
-  }, [isPollingActive])
+  }, [isPollingActive, fetchTopScorers])
 
   const toggleGameExpansion = (gameId: string) => {
     setExpandedGames(prev => {
@@ -253,12 +258,13 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
   const refreshGames = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/live/poll', { method: 'POST' })
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+      const response = await fetch(`${API_BASE}/live/poll`, { method: 'POST' })
       const data = await response.json()
       
       if (data.success) {
         // Refetch games after manual poll
-        const gamesResponse = await fetch('/api/live?live_only=true')
+        const gamesResponse = await fetch(`${API_BASE}/live?live_only=true`)
         const gamesData = await gamesResponse.json()
         
         if (gamesData.success) {
