@@ -108,6 +108,7 @@ router.get('/export/:exportId', async (req, res) => {
     const config = await Config.getConfig();
     const ESPNPlayer = require('../models/ESPNPlayer');
     const currentSeason = config.currentSeason || 2025;
+    const currentWeek = config.currentWeek || 1;
     // Build query
     const query = {};
     if (position && position !== 'all') {
@@ -143,8 +144,10 @@ router.get('/export/:exportId', async (req, res) => {
             : player.weekly_actuals || {};
           const weekData = [];
           let totalProj = 0;
+          let totalProjToCurrent = 0;
           let totalActual = 0;
           let weekCount = 0;
+          let actualWeekCount = 0;
           for (let w = 1; w <= 18; w++) {
             const weekKey = w.toString();
             const projWeek = projections[weekKey];
@@ -152,19 +155,28 @@ router.get('/export/:exportId', async (req, res) => {
             // Access the scoring type (default to std if not available)
             let proj = projWeek?.[scoringType] ?? projWeek?.std ?? null;
             let actual = actualWeek?.[scoringType] ?? actualWeek?.std ?? null;
+            // Only count actuals for weeks up to current week (avoid counting 0s for future weeks)
+            const isPastWeek = w <= currentWeek;
             // Handle null values properly
             weekData.push(proj !== null && proj !== undefined ? proj.toFixed(2) : '', actual !== null && actual !== undefined ? actual.toFixed(2) : '');
             if (proj !== null && proj !== undefined) {
               totalProj += proj;
               weekCount++;
+              // Also track projections only up to current week for fair comparison
+              if (isPastWeek) {
+                totalProjToCurrent += proj;
+              }
             }
-            if (actual !== null && actual !== undefined) {
+            // Only count actuals for weeks that have been played (up to current week)
+            if (actual !== null && actual !== undefined && isPastWeek) {
               totalActual += actual;
+              actualWeekCount++;
             }
           }
           const avgProj = weekCount > 0 ? (totalProj / weekCount).toFixed(2) : 0;
-          const avgActual = weekCount > 0 ? (totalActual / weekCount).toFixed(2) : 0;
-          const diff = (totalActual - totalProj).toFixed(2);
+          const avgActual = actualWeekCount > 0 ? (totalActual / actualWeekCount).toFixed(2) : 0;
+          // Diff compares actuals vs projections only up to current week for fair comparison
+          const diff = (totalActual - totalProjToCurrent).toFixed(2);
           const row = [
             player.name,
             player.position || '',
@@ -256,9 +268,12 @@ router.get('/export/:exportId', async (req, res) => {
             // Access the scoring type (default to std if not available)
             let proj = projWeek?.[scoringType] ?? projWeek?.std ?? null;
             let actual = actualWeek?.[scoringType] ?? actualWeek?.std ?? null;
+            // Only count actuals for weeks up to current week (avoid counting 0s for future weeks)
+            const isPastWeek = w <= currentWeek;
             // Handle null values properly
             weekData.push(proj !== null && proj !== undefined ? proj.toFixed(2) : '', actual !== null && actual !== undefined ? actual.toFixed(2) : '');
-            if (actual !== null && actual !== undefined) {
+            // Only count actuals for weeks that have been played (up to current week)
+            if (actual !== null && actual !== undefined && isPastWeek) {
               totalPoints += actual;
             }
           }

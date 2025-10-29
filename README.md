@@ -4,38 +4,36 @@ A comprehensive, full-stack fantasy football analytics platform that provides re
 
 ## Features
 
-### 🏈 **Live Game Tracking**
-- **Real-time Score Updates**: Live NFL game scores and play-by-play data
-- **Game Polling Service**: Automated background polling for live game updates
-- **Live Score Strip**: Real-time game status display with team logos and scores
-- **Game Situation Tracking**: Down, distance, possession, and red zone indicators
-
-### 🤖 **AI-Powered Analytics**
-- **AI Insights Engine**: Google Generative AI integration for fantasy analysis
-- **Weekly AI Recommendations**: Automated weekly player recommendations
-- **Custom Query System**: Ask AI questions about your fantasy team and players
-- **News Analysis**: AI-powered analysis of fantasy football news and trends
-- **Smart Filtering**: AI-enhanced news filtering and relevance scoring
-
-### 📊 **Player Analytics**
-- **Comprehensive Player Database**: Full NFL player profiles with FantasyPros integration
-- **Player Projections**: Multi-scoring format projections (STD, PPR, HALF)
-- **Player Outlook**: Detailed player analysis and future performance predictions
-- **Player Sync**: Automated player data synchronization from multiple sources
-- **Player Browser**: Advanced player search and filtering capabilities
-
-### 📰 **News & Content**
-- **Fantasy News Feed**: Aggregated fantasy football news from multiple sources
-- **Enhanced News Articles**: Rich article display with impact scoring and sentiment analysis
-- **News Filtering**: Advanced filtering by category, impact, source, and sentiment
-- **Web Scraping**: Automated content scraping and analysis
-- **News Tracking**: Track important news items and their fantasy impact
-
-### ⚙️ **Configuration & Management**
-- **Dynamic Configuration**: Runtime configuration updates for season and week settings
-- **Data Synchronization**: Automated sync with ESPN, FantasyPros, and other data sources
-- **Dashboard Analytics**: Comprehensive dashboard with stats cards and system status
-- **Color Scheme Management**: Dark/light mode with customizable color schemes
+- Dashboard:
+  - Live score strip with polling toggle and current week display
+  - Game highlights when no live games are active
+  - News feed with filters; one-click syncs for players, week, news, and boxscores
+  - Configuration modal to change season/week and enable/disable polling
+- Games:
+  - Week navigation and refresh
+  - Real-time game list with status, venue, clock; live updates overlay
+  - Game modal with fantasy scorers (home/away), team context, and points
+- League:
+  - Standings (wins/losses, PF/PA, streak, logos) and week matchups (status badges)
+  - Week selector with current/past/future labels and prev/next week controls
+  - Detailed rosters view: starters/bench, totals, per-player points; auto background sync if stale
+- Players:
+  - Top performers by position for a selected week
+  - Player browser with search, position/team/roster-status filters, sort by points/projections
+  - Player modal with weekly actuals vs projections and team/roster context
+- Player Profile:
+  - Overview, weekly stats table, latest news, and injury report
+  - Current-week projections, historical vs projected comparisons, season summaries
+- Analytics:
+  - Manager score leaderboard (efficiency = actual/optimal)
+  - Team weekly breakdown: starters vs optimal lineup, bench impact, slot-by-slot changes
+  - Position group averages per team with optional league ranking
+- Data:
+  - CSV exports (projections, performance, analytics) with progress and download handling
+- Settings:
+  - Local analysis settings (teams, roster spots, scoring type) with save/reset
+- UI:
+  - Dark/light modes and color scheme utilities
 
 ## Tech Stack
 
@@ -67,86 +65,70 @@ A comprehensive, full-stack fantasy football analytics platform that provides re
 
 ```
 fantasyapp/
-├── backend/                    # Node.js/Express backend
+├── backend/                      # Node.js/Express backend
 │   ├── src/
-│   │   ├── models/            # MongoDB schemas (Game, Player, Projection, Stats)
-│   │   ├── routes/            # API endpoints
-│   │   │   ├── analysis.js    # AI analysis endpoints
-│   │   │   ├── config.js      # Configuration management
-│   │   │   ├── depthChart.js  # Depth chart data
-│   │   │   ├── live.js        # Live game data
-│   │   │   ├── playerDetails.js # Detailed player info
-│   │   │   ├── players.js     # Player management
-│   │   │   ├── ppr.js         # PPR projections
-│   │   │   └── projections.js # Player projections
-│   │   ├── services/          # Business logic and external APIs
-│   │   │   ├── espnService.js      # ESPN API integration
-│   │   │   ├── fantasyProsService.js # FantasyPros API
-│   │   │   ├── gamePollingService.js # Live game polling
-│   │   │   └── sportsDataService.js  # Sports data integration
-│   │   ├── cron/              # Scheduled jobs
-│   │   │   ├── fetchData.js   # Data fetching tasks
-│   │   │   └── updateData.js  # Data update tasks
-│   │   └── server.js          # Main server file
-│   ├── spec/                  # API specifications
+│   │   ├── models/              # Mongoose models (Config, Game, Matchup, etc.)
+│   │   ├── routes/              # API route modules
+│   │   │   ├── config.js        # System configuration
+│   │   │   ├── data.js          # Data access and utilities
+│   │   │   ├── espnplayers.js   # ESPN player data helpers
+│   │   │   ├── espnSync.js      # ESPN sync utilities
+│   │   │   ├── league.js        # League and lineup tools
+│   │   │   ├── live.js          # Live game data
+│   │   │   └── news.js          # News aggregation
+│   │   ├── services/            # Business logic and external APIs
+│   │   │   ├── boxscoreSync.js
+│   │   │   ├── espnService.js
+│   │   │   ├── fantasyProsNewsService.js
+│   │   │   ├── gamePollingService.js
+│   │   │   └── imageProcessor.js
+│   │   ├── cron/
+│   │   │   └── updateData.js    # Data update tasks
+│   │   ├── utils/               # Utility modules
+│   │   │   ├── optimalLineupCalculator.js
+│   │   │   └── slots.js
+│   │   └── server.js            # Main server file (mounts /api/* routes)
+│   ├── spec/                    # API specifications (OpenAPI files)
 │   ├── package.json
-│   └── .env
-├── frontend/                   # React frontend
+│   └── render.yaml              # Deployment config (Render)
+├── frontend/                     # React + Vite frontend (TypeScript)
 │   ├── src/
-│   │   ├── components/        # React components
-│   │   │   ├── dashboard/     # Dashboard-specific components
-│   │   │   │   ├── AIInsightsSidebar.tsx
-│   │   │   │   ├── Configuration.tsx
-│   │   │   │   ├── NewsFeed.tsx
-│   │   │   │   ├── NewsFilters.tsx
-│   │   │   │   ├── QuickActions.tsx
-│   │   │   │   └── StatsCards.tsx
-│   │   │   ├── ui/            # Reusable UI components
-│   │   │   │   ├── badge.tsx
-│   │   │   │   ├── button.tsx
-│   │   │   │   ├── card.tsx
-│   │   │   │   ├── input.tsx
-│   │   │   │   └── select.tsx
-│   │   │   ├── AIInsights.tsx
-│   │   │   ├── ColorSchemeToggler.tsx
-│   │   │   ├── EnhancedNewsArticle.tsx
-│   │   │   ├── Layout.tsx
-│   │   │   ├── LiveScoreStrip.tsx
-│   │   │   └── PlayerAvatar.tsx
-│   │   ├── pages/             # Page components
-│   │   │   ├── Dashboard.tsx      # Main dashboard
-│   │   │   ├── Games.tsx          # Games page
-│   │   │   ├── PlayerBrowser.tsx  # Player search/browse
-│   │   │   ├── PlayerOutlook.tsx  # Player analysis
-│   │   │   ├── PlayerProfile.tsx  # Individual player details
-│   │   │   ├── PlayerSync.tsx     # Player data sync
-│   │   │   ├── Settings.tsx       # App settings
-│   │   │   └── WeeklyAnalysis.tsx # Weekly analysis
-│   │   ├── contexts/          # React contexts
-│   │   │   └── ColorSchemeContext.tsx
-│   │   ├── hooks/             # Custom React hooks
-│   │   │   ├── useAI.ts       # AI functionality
-│   │   │   └── useDashboard.ts # Dashboard state management
-│   │   ├── lib/               # Utility libraries
-│   │   │   ├── colorSchemes.ts
-│   │   │   └── utils.ts
-│   │   ├── services/          # API services
-│   │   │   └── api.ts
-│   │   ├── types/             # TypeScript type definitions
-│   │   │   └── dashboard.ts
-│   │   ├── App.tsx            # Main app component
-│   │   ├── main.tsx           # App entry point
-│   │   └── index.css          # Global styles
-│   ├── public/                # Static assets
+│   │   ├── components/
+│   │   │   ├── dashboard/
+│   │   │   └── ui/
+│   │   ├── pages/               # Routes: Dashboard, Games, League, etc.
+│   │   ├── services/            # API client
+│   │   ├── contexts/, hooks/, lib/, types/
+│   │   └── main.tsx, App.tsx
+│   ├── public/
 │   ├── package.json
 │   ├── tailwind.config.js
 │   ├── vite.config.ts
-│   └── tsconfig.node.json
-├── package.json               # Root package.json
+│   └── vercel.json              # Deployment config (Vercel)
+├── package.json                  # Root workspace package
 └── README.md
 ```
 
 ## Getting Started
+
+## Quick Start
+
+```bash
+# Backend
+cd backend && npm install && npm run dev
+
+# Frontend (in a new shell)
+cd frontend && npm install && npm run dev
+```
+
+Then visit:
+- Frontend: http://localhost:6100
+- API: http://localhost:6300 (health: /api/health)
+
+## Demo
+
+The latest frontend is deployed on Vercel at [fantasyapp.vercel.app](https://fantasyapp.vercel.app).
+- If your API is running elsewhere (e.g., local `http://localhost:6300`), configure the frontend to point at it via `VITE_API_BASE_URL` or enable the backend `CORS_ORIGINS` to include the Vercel domain.
 
 ### Prerequisites
 
@@ -185,22 +167,45 @@ fantasyapp/
 
 ### Environment Variables
 
-Create a `.env` file in the backend directory:
+Create a `.env` file in the `backend/` directory. The server validates the following variables at startup:
 
 ```env
-# Server Configuration
+# Server
 PORT=6300
 NODE_ENV=development
+CORS_ORIGINS=http://localhost:6100
 
 # Database
 MONGODB_URI=mongodb://localhost:27017/fantasy_football
 
-# API Keys
-FANTASYPROS_API_KEY=your_fantasypros_api_key_here
-GOOGLE_AI_API_KEY=your_google_ai_api_key_here
+# ESPN/Season (private leagues require cookies)
+ESPN_LEAGUE_ID=your_espn_league_id
+ESPN_S2_COOKIE=your_espn_s2_cookie
+ESPN_SWID_COOKIE={YOUR-SWID}
+SEASON_ID=2025
 
-# Optional: Additional API keys for extended functionality
-SPORTS_DATA_API_KEY=your_sportsdata_api_key_here
+# Polling and request controls
+API_TIMEOUT=15000
+API_RETRY_ATTEMPTS=3
+API_RETRY_DELAY=750
+GAME_POLL_ACTIVE_INTERVAL=5000
+GAME_POLL_IDLE_INTERVAL=30000
+GAME_POLL_MAX_CONSECUTIVE_ERRORS=10
+
+# Integrations
+GOOGLE_AI_API_KEY=your_google_ai_api_key_here
+# Optional
+FANTASYPROS_API_KEY=your_fantasypros_api_key_here
+```
+
+### Frontend Environment Variables
+
+Create a `.env` in the `frontend/` directory:
+
+```env
+# Base URL for API requests from the frontend
+# Defaults to `/api` (useful when frontend and backend are reverse-proxied together)
+VITE_API_BASE_URL=http://localhost:6300/api
 ```
 
 ## Usage
@@ -219,34 +224,28 @@ SPORTS_DATA_API_KEY=your_sportsdata_api_key_here
 - **Web Scraping**: Automated news scraping and analysis
 - **AI Analysis**: On-demand AI insights and weekly recommendations
 
-### API Endpoints
+### ESPN Integration
 
-#### Player Management
-- `GET /api/players` - Get all players with filtering options
-- `GET /api/players/:id` - Get specific player details
-- `POST /api/players/sync` - Sync player data from external sources
+- Uses the `espn-fantasy-football-api` client plus direct ESPN endpoints to get complete league data (teams, rosters, matchups, standings) and weekly player stats.
+- For private leagues, set `ESPN_S2_COOKIE` and `ESPN_SWID_COOKIE` in `.env`. Without these, ESPN calls may return 401 and endpoints will respond with `requiresAuth: true`.
+- Key modules: `backend/src/services/espnService.js` (fetch/merge/mapping), `backend/src/services/boxscoreSync.js` (ingestion to Mongo models: `WeeklyPlayerLine`, `WeeklyTeamTotals`, `Matchup`, `FantasyTeam`).
+- Typical flow:
+  1) Ingest: call `/api/sync/espn/current-week` or use scripts `npm run sync:week` / `sync:backfill`.
+  2) Consume: UI and APIs read `/api/league/overview`, `/api/league/matchups`, `/api/league/standings`.
+  3) Explore players: `/api/espnplayers` supports filtering, sorting, and top-performers.
 
-#### Projections & Analysis
-- `GET /api/projections` - Get player projections for current week
-- `GET /api/ppr` - Get PPR-specific projections and rankings
-- `GET /api/analysis` - Get AI-powered analysis and insights
-- `POST /api/analysis/query` - Submit custom AI queries
+### API Surface (route groups)
 
-#### Live Game Data
-- `GET /api/live/games` - Get current live games and scores
-- `GET /api/live/scoreboard` - Get complete scoreboard data
-- `POST /api/live/polling/start` - Start live game polling
-- `POST /api/live/polling/stop` - Stop live game polling
+Base URL: `http://localhost:6300/api`
 
-#### Configuration
-- `GET /api/config` - Get current system configuration
-- `PUT /api/config` - Update system configuration
-- `POST /api/config/season/:season` - Update current season
-- `POST /api/config/week/:week` - Update current week
-
-#### System Health
-- `GET /api/health` - System health check and status
-- `GET /api/depth-chart` - Get team depth chart information
+- `/players` — Player details and lookup
+- `/live` — Live games, scoreboards, and polling controls
+- `/config` — Read/update runtime configuration
+- `/data` — Data access utilities (e.g., weeks, positions)
+- `/sync/espn` — ESPN synchronization helpers
+- `/espnplayers` — ESPN player utilities
+- `/league` — League tools (optimal lineup, roster utilities)
+- `/health` — Health/status at `/api/health` (JSON) and `/healthz` (plain text)
 
 ## Development
 
@@ -254,9 +253,10 @@ SPORTS_DATA_API_KEY=your_sportsdata_api_key_here
 
 ```bash
 cd backend
-npm run dev          # Start development server
-npm run data:fetch   # Fetch latest data
-npm run data:update  # Update projections
+npm run dev                 # Start backend on port 6300
+npm run data:update         # Run data update job
+npm run sync:week           # Sync a single week (requires SEASON_ID, WEEK)
+npm run sync:backfill       # Backfill an entire season (requires SEASON_ID)
 ```
 
 ### Frontend Development
@@ -267,6 +267,12 @@ npm run dev          # Start development server
 npm run build        # Build for production
 npm run preview      # Preview production build
 ```
+
+## Deployment
+
+- Frontend: Vercel (configured via `vercel.json`). Set `VITE_API_BASE_URL` to your backend URL.
+- Backend: Any Node host (Render example in `backend/render.yaml`). Ensure env vars are set and MongoDB reachable.
+- CORS: Add the deployed frontend origin to `CORS_ORIGINS` (comma-separated) in backend `.env`.
 
 ## Contributing
 
@@ -286,66 +292,13 @@ For support or questions, please open an issue on GitHub or contact the developm
 
 ## Roadmap
 
-### ✅ **Completed Features**
-- [x] Real-time game tracking and live scores
-- [x] AI-powered fantasy analysis with Google Generative AI
-- [x] Comprehensive player database with FantasyPros integration
-- [x] Advanced news filtering and sentiment analysis
-- [x] Web scraping for fantasy news and content
-- [x] Dynamic configuration management
-- [x] Responsive dashboard with dark/light mode
-- [x] Automated data synchronization
-- [x] Live game polling service
+- Completed: live game polling, player/league tools, news aggregation, config API, dashboard UI.
+- In progress: lineup optimizer improvements, ESPN sync refinements, stability/observability.
+- Planned: ML projections, trade/waiver tools, multi-user/auth, notifications.
 
-### 🚧 **In Development**
-- [ ] Enhanced player projections with machine learning
-- [ ] Advanced trade analyzer with AI recommendations
-- [ ] Waiver wire priority calculator
-- [ ] Historical performance analysis
-- [ ] Custom league scoring system integration
+## Troubleshooting
 
-### 🔮 **Future Enhancements**
-- [ ] Mobile app (React Native)
-- [ ] Multi-user support and team management
-- [ ] Advanced VBD algorithms
-- [ ] Playoff schedule impact analysis
-- [ ] Social features and league chat
-- [ ] Advanced analytics dashboard
-- [ ] Integration with major fantasy platforms (ESPN, Yahoo, Sleeper)
-- [ ] Real-time notifications and alerts
-```
-
-## Key Features Overview
-
-This fantasy football analytics platform provides a comprehensive suite of tools for fantasy managers:
-
-### **🏈 Live Game Experience**
-- Real-time NFL game tracking with live scores and game situations
-- Automated polling service for continuous updates during game days
-- Interactive score strip with team logos and detailed game information
-
-### **🤖 AI-Powered Insights**
-- Google Generative AI integration for advanced fantasy analysis
-- Custom query system for personalized insights
-- Weekly AI recommendations based on current data
-- News analysis with sentiment and impact scoring
-
-### **📊 Advanced Analytics**
-- Comprehensive player database with FantasyPros integration
-- Multi-format projections (Standard, PPR, Half-PPR)
-- Player outlook and performance predictions
-- Advanced filtering and search capabilities
-
-### **📰 News & Content Management**
-- Aggregated fantasy news from multiple sources
-- Web scraping for automated content collection
-- Advanced filtering by category, impact, and sentiment
-- Enhanced article display with relevance scoring
-
-### **⚙️ System Management**
-- Dynamic configuration for season and week settings
-- Automated data synchronization from multiple sources
-- Comprehensive dashboard with system status monitoring
-- Responsive design with customizable color schemes
-
-The platform is built with modern technologies and follows best practices for scalability, maintainability, and user experience. It's designed to be a comprehensive solution for serious fantasy football managers who want data-driven insights and real-time information.
+- 401 from ESPN endpoints: set `ESPN_S2_COOKIE` and `ESPN_SWID_COOKIE` for private leagues.
+- Cannot connect to MongoDB: verify `MONGODB_URI` and network/firewall rules.
+- CORS errors in browser: include your frontend origin in backend `CORS_ORIGINS`.
+- Frontend cannot reach API: set `frontend/.env` `VITE_API_BASE_URL` to your API (e.g., `https://api.example.com/api`).
