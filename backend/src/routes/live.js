@@ -363,8 +363,8 @@ router.get('/highlights', async (req, res) => {
     const currentWeek = week ? parseInt(week) : config.currentWeek || 1;
     const ESPNPlayer = require('../models/ESPNPlayer');
     
-    // Get recent finalized games (current week and previous week)
-    const recentGames = await Game.find({
+    // Try to get recent finalized games from database (current week and previous week)
+    let recentGames = await Game.find({
       season: currentSeason,
       week: { $in: [currentWeek, currentWeek - 1] },
       status: 'STATUS_FINAL'
@@ -372,6 +372,31 @@ router.get('/highlights', async (req, res) => {
       .sort({ date: -1 })
       .limit(20)
       .lean();
+    
+    // If no games in database, fetch from ESPN API in real-time
+    if (!recentGames || recentGames.length === 0) {
+      console.log('[HIGHLIGHTS] No games in database, fetching from ESPN API for week', currentWeek);
+      try {
+        const espnGames = await espnService.fetchScoreboard(currentWeek, currentSeason);
+        // Filter for completed games
+        recentGames = espnGames
+          .filter(game => game.status === 'STATUS_FINAL')
+          .slice(0, 20)
+          .map(game => ({
+            eventId: game.eventId,
+            week: game.week,
+            season: game.season,
+            status: game.status,
+            homeTeam: game.homeTeam,
+            awayTeam: game.awayTeam,
+            date: game.date
+          }));
+        console.log('[HIGHLIGHTS] Fetched', recentGames.length, 'games from ESPN');
+      } catch (err) {
+        console.error('[HIGHLIGHTS] Error fetching from ESPN:', err);
+        recentGames = [];
+      }
+    }
     
     // Get all players to find top scorers and booms
     const allPlayers = await ESPNPlayer.find({}).lean();
