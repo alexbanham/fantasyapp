@@ -1141,7 +1141,7 @@ router.get('/analytics/manager-score', async (req, res) => {
       if (t.team_name) teamNamesMap.set(t.team_id, t.team_name);
     });
     
-    // Fetch from current week to get most up-to-date standings
+    // Fetch from current week to get most up-to-date standings (fixed to use currentWeek not hardcoded 1)
     const currentWeek = config.currentWeek || 1;
     const comprehensiveResult = await espnService.getComprehensiveLeagueData(season, currentWeek);
     const espnTeamsMap = new Map();
