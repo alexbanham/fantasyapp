@@ -146,7 +146,8 @@ const PlayerBrowser = () => {
       params.set('week', filters.week.toString())
       params.set('scoringType', filters.scoringType)
 
-      const response = await fetch(`/api/espnplayers?${params.toString()}`)
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+      const response = await fetch(`${API_BASE}/espnplayers?${params.toString()}`)
       const data = await response.json()
       
       if (data.success) {
@@ -165,7 +166,8 @@ const PlayerBrowser = () => {
       params.set('scoringType', filters.scoringType)
       params.set('limit', '200') // Increased limit to ensure we have enough players per position
 
-      const response = await fetch(`/api/espnplayers/top-performers?${params.toString()}`)
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+      const response = await fetch(`${API_BASE}/espnplayers/top-performers?${params.toString()}`)
       const data = await response.json()
       
       if (data.success) {
@@ -177,23 +179,24 @@ const PlayerBrowser = () => {
   }
 
   const handlePlayerClick = async (player: ESPNPlayer) => {
-    // If this is a top performer (missing weekly data), fetch full player data
-    if (!player.weekly_actuals && !player.weekly_projections && player.espn_id) {
-      try {
-        const response = await fetch(`/api/espnplayers/${player.espn_id}`);
-        const data = await response.json();
-        
-        if (data.success) {
-          setSelectedPlayer(data.player);
-        } else {
+      // If this is a top performer (missing weekly data), fetch full player data
+      if (!player.weekly_actuals && !player.weekly_projections && player.espn_id) {
+        try {
+          const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+          const response = await fetch(`${API_BASE}/espnplayers/${player.espn_id}`);
+          const data = await response.json();
+          
+          if (data.success) {
+            setSelectedPlayer(data.player);
+          } else {
+            setSelectedPlayer(player);
+          }
+        } catch (error) {
           setSelectedPlayer(player);
         }
-      } catch (error) {
+      } else {
         setSelectedPlayer(player);
       }
-    } else {
-      setSelectedPlayer(player);
-    }
     
     setShowPlayerModal(true);
   }
