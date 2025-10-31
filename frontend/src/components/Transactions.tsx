@@ -31,7 +31,7 @@ import {
   Minus,
   Move
 } from 'lucide-react'
-import { Transaction, TransactionStats } from '../services/api'
+import { Transaction, TransactionStats, TransactionItem } from '../services/api'
 
 interface TransactionsProps {
   transactions: Transaction[]
@@ -482,7 +482,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                           {/* Group trade items by team */}
                           {(() => {
                             const tradeItems = tx.items.filter(item => item.type === 'TRADE');
-                            const teamGroups = new Map<number, { team: typeof tx.participatingTeams[0], sending: typeof tx.items[], receiving: typeof tx.items[] }>();
+                            const teamGroups = new Map<number, { team: typeof tx.participatingTeams[0], sending: TransactionItem[], receiving: TransactionItem[] }>();
                             
                             // Initialize team groups
                             tx.participatingTeams.forEach(team => {
