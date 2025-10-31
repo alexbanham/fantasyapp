@@ -69,13 +69,15 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
   const [topScorers, setTopScorers] = useState<Map<string, { homePlayers: TopScorer[], awayPlayers: TopScorer[] }>>(new Map())
   const [loadingScorers, setLoadingScorers] = useState<Set<string>>(new Set())
   const expandedGamesRef = useRef<Set<string>>(new Set())
+  const loadingScorersRef = useRef<Set<string>>(new Set())
 
   const fetchTopScorers = useCallback(async (gameId: string, forceRefresh = false) => {
     // Don't fetch if already loading, unless forcing refresh
-    if (loadingScorers.has(gameId) && !forceRefresh) {
+    if (loadingScorersRef.current.has(gameId) && !forceRefresh) {
       return
     }
 
+    loadingScorersRef.current = new Set(loadingScorersRef.current).add(gameId)
     setLoadingScorers(prev => new Set(prev).add(gameId))
 
     try {
@@ -91,13 +93,16 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
       }
     } catch (err) {
     } finally {
+      const newSet = new Set(loadingScorersRef.current)
+      newSet.delete(gameId)
+      loadingScorersRef.current = newSet
       setLoadingScorers(prev => {
         const newSet = new Set(prev)
         newSet.delete(gameId)
         return newSet
       })
     }
-  }, [loadingScorers])
+  }, [])
 
   // Poll for live games
   useEffect(() => {

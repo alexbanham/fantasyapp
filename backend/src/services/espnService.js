@@ -1545,6 +1545,239 @@ class ESPNService {
     }
   }
 
+  // Get league transactions (trades, waivers, roster moves)
+  async getTransactions(seasonId, scoringPeriodId = null) {
+    try {
+      const leagueId = process.env.ESPN_LEAGUE_ID;
+      const baseUrl = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${seasonId}/segments/0/leagues/${leagueId}`;
+      
+      const headers = {
+        'Cookie': `espn_s2=${process.env.ESPN_S2_COOKIE}; SWID=${process.env.ESPN_SWID_COOKIE}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      };
+
+      const url = `${baseUrl}?view=mTransactions2`;
+      const response = await axios.get(url, { headers, timeout: 15000 });
+
+      let transactions = response.data.transactions || [];
+
+      // Filter by week if provided
+      if (scoringPeriodId !== null) {
+        transactions = transactions.filter(tx => tx.scoringPeriodId === scoringPeriodId);
+      }
+
+      // Get league teams for mapping team IDs to names
+      const leagueDataResult = await this.getComprehensiveLeagueData(seasonId, scoringPeriodId || 1);
+      const teamMap = new Map();
+      if (leagueDataResult.success && leagueDataResult.teams) {
+        leagueDataResult.teams.forEach(team => {
+          teamMap.set(team.teamId, {
+            id: team.teamId,
+            name: team.name,
+            abbreviation: team.abbreviation,
+            logo: team.logo
+          });
+        });
+      }
+
+      // Get all unique player IDs from transactions
+      const playerIds = new Set();
+      transactions.forEach(tx => {
+        if (tx.items) {
+          tx.items.forEach(item => {
+            if (item.playerId && item.playerId > 0) {
+              playerIds.add(item.playerId);
+            }
+          });
+        }
+      });
+
+      // Fetch player details from database
+      const ESPNPlayer = require('../models/ESPNPlayer');
+      const players = await ESPNPlayer.find({ 
+        espn_id: { $in: Array.from(playerIds) } 
+      }).select('espn_id name first_name last_name position pro_team_id headshot_url').lean();
+
+      // Create player map for quick lookup
+      const playerMap = new Map();
+      players.forEach(player => {
+        playerMap.set(player.espn_id, {
+          espn_id: player.espn_id,
+          name: player.name,
+          firstName: player.first_name,
+          lastName: player.last_name,
+          position: player.position,
+          proTeamId: player.pro_team_id,
+          headshotUrl: player.headshot_url
+        });
+      });
+
+      // Helper to get slot label
+      const getSlotLabel = (slotId) => {
+        const slots = {
+          '-1': 'FA/Waiver',
+          0: 'QB',
+          1: 'TQB',
+          2: 'RB',
+          3: 'RB/WR',
+          4: 'WR',
+          5: 'WR/TE',
+          6: 'TE',
+          7: 'OP',
+          16: 'D/ST',
+          17: 'K',
+          20: 'Bench',
+          21: 'IR',
+          23: 'FLEX'
+        };
+        return slots[slotId] || `Slot ${slotId}`;
+      };
+
+      // Process and enrich transactions
+      const processedTransactions = transactions.map(tx => {
+        const processed = {
+          id: tx.id,
+          type: tx.type,
+          status: tx.status,
+          executionType: tx.executionType,
+          teamId: tx.teamId,
+          teamName: teamMap.get(tx.teamId)?.name || `Team ${tx.teamId}`,
+          teamLogo: teamMap.get(tx.teamId)?.logo || null,
+          scoringPeriodId: tx.scoringPeriodId,
+          proposedDate: tx.proposedDate,
+          processDate: tx.processDate,
+          rating: tx.rating,
+          isPending: tx.isPending || false,
+          bidAmount: tx.bidAmount || 0,
+          relatedTransactionId: tx.relatedTransactionId || null,
+          items: (tx.items || []).map(item => {
+            const playerInfo = item.playerId > 0 ? playerMap.get(item.playerId) : null;
+            const fromSlot = getSlotLabel(item.fromLineupSlotId);
+            const toSlot = getSlotLabel(item.toLineupSlotId);
+            
+            // Determine action description
+            let action = '';
+            if (item.type === 'ADD') {
+              action = `Added to ${toSlot}`;
+            } else if (item.type === 'DROP') {
+              action = `Dropped from ${fromSlot}`;
+            } else if (item.type === 'TRADE') {
+              const fromTeam = item.fromTeamId ? (teamMap.get(item.fromTeamId)?.name || `Team ${item.fromTeamId}`) : 'FA';
+              const toTeam = item.toTeamId ? (teamMap.get(item.toTeamId)?.name || `Team ${item.toTeamId}`) : 'FA';
+              action = `Traded from ${fromTeam} to ${toTeam}`;
+            } else if (item.type === 'LINEUP') {
+              if (item.fromLineupSlotId === 20 && item.toLineupSlotId !== 20) {
+                action = `Moved from Bench to ${toSlot}`;
+              } else if (item.fromLineupSlotId !== 20 && item.toLineupSlotId === 20) {
+                action = `Moved from ${fromSlot} to Bench`;
+              } else if (item.fromLineupSlotId === item.toLineupSlotId) {
+                action = `No change (${fromSlot})`;
+              } else {
+                action = `Moved from ${fromSlot} to ${toSlot}`;
+              }
+            } else {
+              action = item.type;
+            }
+
+            return {
+              type: item.type,
+              playerId: item.playerId,
+              playerName: playerInfo?.name || (item.playerId > 0 ? `Player ${item.playerId}` : 'Unknown'),
+              playerPosition: playerInfo?.position || null,
+              playerHeadshot: playerInfo?.headshotUrl || null,
+              fromTeamId: item.fromTeamId,
+              toTeamId: item.toTeamId,
+              fromTeamName: item.fromTeamId ? (teamMap.get(item.fromTeamId)?.name || `Team ${item.fromTeamId}`) : null,
+              toTeamName: item.toTeamId ? (teamMap.get(item.toTeamId)?.name || `Team ${item.toTeamId}`) : null,
+              fromLineupSlotId: item.fromLineupSlotId,
+              toLineupSlotId: item.toLineupSlotId,
+              fromSlotLabel: fromSlot,
+              toSlotLabel: toSlot,
+              action: action,
+              isKeeper: item.isKeeper || false
+            };
+          })
+        };
+
+        // For trades, identify participating teams
+        if (tx.type === 'TRADE_PROPOSAL' || tx.items?.some(item => item.type === 'TRADE')) {
+          const tradeItems = tx.items?.filter(item => item.type === 'TRADE') || [];
+          const teams = new Set();
+          tradeItems.forEach(item => {
+            if (item.fromTeamId && item.fromTeamId !== 0) teams.add(item.fromTeamId);
+            if (item.toTeamId && item.toTeamId !== 0) teams.add(item.toTeamId);
+          });
+          processed.participatingTeams = Array.from(teams).map(teamId => ({
+            id: teamId,
+            name: teamMap.get(teamId)?.name || `Team ${teamId}`,
+            logo: teamMap.get(teamId)?.logo || null
+          }));
+        }
+
+        return processed;
+      });
+
+      // Calculate statistics
+      const stats = {
+        total: processedTransactions.length,
+        byType: {},
+        byStatus: {},
+        byWeek: {},
+        tradeCount: 0,
+        waiverCount: 0,
+        freeAgentCount: 0,
+        rosterMoveCount: 0
+      };
+
+      processedTransactions.forEach(tx => {
+        // Count by type
+        stats.byType[tx.type] = (stats.byType[tx.type] || 0) + 1;
+        
+        // Count by status
+        stats.byStatus[tx.status] = (stats.byStatus[tx.status] || 0) + 1;
+        
+        // Count by week
+        const week = tx.scoringPeriodId;
+        stats.byWeek[week] = (stats.byWeek[week] || 0) + 1;
+
+        // Count transaction categories
+        if (tx.type === 'TRADE_PROPOSAL' || tx.items?.some(item => item.type === 'TRADE')) {
+          stats.tradeCount++;
+        } else if (tx.type === 'WAIVER') {
+          stats.waiverCount++;
+        } else if (tx.type === 'FREEAGENT') {
+          stats.freeAgentCount++;
+        } else if (tx.type === 'ROSTER') {
+          stats.rosterMoveCount++;
+        }
+      });
+
+      return {
+        success: true,
+        transactions: processedTransactions,
+        stats,
+        seasonId,
+        scoringPeriodId: scoringPeriodId || 'all',
+        totalCount: processedTransactions.length
+      };
+
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      if (error.response?.status === 401) {
+        return {
+          success: false,
+          error: 'Authentication required',
+          requiresAuth: true
+        };
+      }
+      
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch transactions'
+      };
+    }
+  }
+
 }
 
 module.exports = new ESPNService();

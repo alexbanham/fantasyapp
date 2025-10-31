@@ -787,6 +787,77 @@ export const syncWeek = async (seasonId?: number, week?: number, force: boolean 
   return response.data
 }
 
+// Transaction types and API
+export interface TransactionItem {
+  type: string
+  playerId: number
+  playerName: string
+  playerPosition: string | null
+  playerHeadshot: string | null
+  fromTeamId: number | null
+  toTeamId: number | null
+  fromTeamName: string | null
+  toTeamName: string | null
+  fromLineupSlotId: number
+  toLineupSlotId: number
+  fromSlotLabel: string
+  toSlotLabel: string
+  action: string
+  isKeeper: boolean
+}
+
+export interface Transaction {
+  id: string
+  type: string
+  status: string
+  executionType: string
+  teamId: number
+  teamName: string
+  teamLogo: string | null
+  scoringPeriodId: number
+  proposedDate: number
+  processDate?: number
+  rating: number
+  isPending: boolean
+  bidAmount: number
+  relatedTransactionId: string | null
+  items: TransactionItem[]
+  participatingTeams?: Array<{
+    id: number
+    name: string
+    logo: string | null
+  }>
+}
+
+export interface TransactionStats {
+  total: number
+  byType: Record<string, number>
+  byStatus: Record<string, number>
+  byWeek: Record<number, number>
+  tradeCount: number
+  waiverCount: number
+  freeAgentCount: number
+  rosterMoveCount: number
+}
+
+export interface TransactionsResponse {
+  success: boolean
+  transactions: Transaction[]
+  stats: TransactionStats
+  seasonId: number
+  scoringPeriodId: number | 'all'
+  totalCount: number
+}
+
+export const getLeagueTransactions = async (seasonId?: number, week?: number): Promise<TransactionsResponse> => {
+  const params = new URLSearchParams()
+  if (seasonId) params.append('seasonId', seasonId.toString())
+  if (week) params.append('scoringPeriodId', week.toString())
+  
+  const response = await api.get(`/league/transactions?${params.toString()}`)
+  return response.data
+}
+
 // Backfill all weeks boxscore data
 export const backfillBoxscores = async (seasonId?: number, maxWeeks?: number) => {
   const response = await api.post('/league/sync/backfill', { seasonId, maxWeeks })

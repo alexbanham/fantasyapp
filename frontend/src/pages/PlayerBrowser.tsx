@@ -90,6 +90,7 @@ const PlayerBrowser = () => {
   const [players, setPlayers] = useState<ESPNPlayer[]>([])
   const [filteredPlayers, setFilteredPlayers] = useState<ESPNPlayer[]>([])
   const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([])
+  const [cumulativeLeaders, setCumulativeLeaders] = useState<Record<string, Array<{ player: ESPNPlayer; total: number }>>>({})
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filters, setFilters] = useState<PlayerFilters>({
@@ -137,6 +138,43 @@ const PlayerBrowser = () => {
   }, [players, searchTerm, filters.position, filters.team, filters.sortBy, filters.sortOrder, filters.rosterStatus])
   
   // Note: No need to debounce or reload from backend when searching - client-side filtering handles it
+
+  // Recompute cumulative leaders through selected week
+  useEffect(() => {
+    if (!players || players.length === 0) {
+      setCumulativeLeaders({})
+      return
+    }
+
+    const uptoWeek = Math.max(1, filters.week || 1)
+    const scoringKey = filters.scoringType || 'std'
+
+    const sumThroughWeek = (player: ESPNPlayer): number => {
+      if (!player.weekly_actuals) return 0
+      let total = 0
+      for (let w = 1; w <= uptoWeek; w++) {
+        const weekData = player.weekly_actuals[String(w)]
+        const val = weekData && typeof weekData[scoringKey] === 'number' ? weekData[scoringKey] : 0
+        if (Number.isFinite(val)) total += val
+      }
+      return total
+    }
+
+    const byPosition: Record<string, Array<{ player: ESPNPlayer; total: number }>> = {}
+    players.forEach((p) => {
+      const pos = (p.position || 'OTHER').toUpperCase()
+      const total = sumThroughWeek(p)
+      if (!byPosition[pos]) byPosition[pos] = []
+      byPosition[pos].push({ player: p, total })
+    })
+
+    Object.keys(byPosition).forEach((pos) => {
+      byPosition[pos].sort((a, b) => b.total - a.total)
+      byPosition[pos] = byPosition[pos].slice(0, 5)
+    })
+
+    setCumulativeLeaders(byPosition)
+  }, [players, filters.week, filters.scoringType])
 
   const loadPlayers = async () => {
     try {
@@ -599,6 +637,57 @@ const PlayerBrowser = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Best Through Selected Week Menu */}
+        {Object.keys(cumulativeLeaders).length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Trophy className="h-5 w-5 text-yellow-500" />
+                <span>Best Through Week {filters.week}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {(() => {
+                  // Order positions in a consistent way
+                  const order = ['QB', 'RB', 'WR', 'TE', 'DST', 'D/ST', 'K']
+                  const entries = Object.entries(cumulativeLeaders).sort(([a], [b]) => {
+                    const ia = order.indexOf(a)
+                    const ib = order.indexOf(b)
+                    if (ia === -1 && ib === -1) return a.localeCompare(b)
+                    if (ia === -1) return 1
+                    if (ib === -1) return -1
+                    return ia - ib
+                  })
+                  return entries.map(([pos, list]) => (
+                    <div key={pos} className="space-y-2">
+                      <div className="flex items-center justify-between border-b pb-1">
+                        <h4 className="text-sm font-bold">{pos}</h4>
+                        <Badge variant="outline" className={cn('text-white', getPositionColor(pos))}>{list.length}</Badge>
+                      </div>
+                      <div className="space-y-1">
+                        {list.map(({ player, total }, idx) => (
+                          <button
+                            key={player._id}
+                            className="w-full flex items-center justify-between text-left px-2 py-1.5 rounded hover:bg-muted/60 transition"
+                            onClick={() => handlePlayerClick(player)}
+                          >
+                            <div className="flex items-center space-x-2 min-w-0">
+                              <span className="text-xs w-5 shrink-0 text-muted-foreground">#{idx + 1}</span>
+                              <span className="truncate text-sm font-medium">{player.name}</span>
+                            </div>
+                            <span className="text-xs font-semibold text-green-600">{total.toFixed(1)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                })()}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Top Performers Section */}
         {topPerformers.length > 0 && (() => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Card } from '../components/ui/card'
+import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { 
@@ -9,17 +9,21 @@ import {
   SelectTrigger,
   SelectValue
 } from '../components/ui/select'
-import { RefreshCw, Trophy, Users, Calendar, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { RefreshCw, Trophy, Users, Calendar, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, ArrowLeftRight } from 'lucide-react'
 import { 
   getLeagueOverview, 
   getAvailableWeeks,
   getLeagueBoxscores,
   syncWeek,
+  getLeagueTransactions,
   LeagueStanding,
   LeagueMatchup,
   LeagueInfo,
-  DetailedMatchup
+  DetailedMatchup,
+  Transaction,
+  TransactionStats
 } from '../services/api'
+import Transactions from '../components/Transactions'
 
 interface LeagueData {
   standings: LeagueStanding[]
@@ -56,6 +60,9 @@ const League: React.FC = () => {
   const [currentWeek, setCurrentWeek] = useState<number | null>(null)
   const [showDetailedMatchups, setShowDetailedMatchups] = useState(false)
   const [scrollToTeam, setScrollToTeam] = useState<number | null>(null)
+  const [activeTab, setActiveTab] = useState<'standings' | 'matchups' | 'rosters' | 'transactions'>('standings')
+  const [transactionsData, setTransactionsData] = useState<{ transactions: Transaction[], stats: TransactionStats } | null>(null)
+  const [loadingTransactions, setLoadingTransactions] = useState(false)
 
   // Handle jumping to a team's detailed roster
   const handleJumpToTeam = (teamId: number) => {
@@ -122,11 +129,32 @@ const League: React.FC = () => {
     }
   }
 
+  const fetchTransactions = async (week?: number | null) => {
+    try {
+      setLoadingTransactions(true)
+      const data = await getLeagueTransactions(leagueData?.seasonId, week || undefined)
+      
+      if (data.success) {
+        setTransactionsData({
+          transactions: data.transactions || [],
+          stats: data.stats
+        })
+      } else {
+        setTransactionsData(null)
+      }
+    } catch (err) {
+      setTransactionsData(null)
+    } finally {
+      setLoadingTransactions(false)
+    }
+  }
+
   const handleRefresh = async () => {
     setRefreshing(true)
     await Promise.all([
       fetchLeagueData(selectedWeek || undefined),
-      fetchBoxscoreData(selectedWeek || undefined)
+      fetchBoxscoreData(selectedWeek || undefined),
+      activeTab === 'transactions' ? fetchTransactions(selectedWeek || undefined) : Promise.resolve()
     ])
   }
 
@@ -171,7 +199,8 @@ const League: React.FC = () => {
         // Always fetch the data first
         await Promise.all([
           fetchLeagueData(selectedWeek),
-          fetchBoxscoreData(selectedWeek)
+          fetchBoxscoreData(selectedWeek),
+          activeTab === 'transactions' ? fetchTransactions(selectedWeek) : Promise.resolve()
         ])
         
         // Check if we got data
@@ -198,6 +227,13 @@ const League: React.FC = () => {
       loadData()
     }
   }, [selectedWeek])
+
+  // Fetch transactions when tab changes
+  useEffect(() => {
+    if (activeTab === 'transactions' && selectedWeek !== null) {
+      fetchTransactions(selectedWeek)
+    }
+  }, [activeTab])
 
   // Handle scrolling to a team's detailed roster
   useEffect(() => {
@@ -428,7 +464,71 @@ const League: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Tabs Navigation */}
+        <div className="mb-6 border-b">
+          <div className="flex space-x-1">
+            <Button
+              variant={activeTab === 'standings' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('standings')}
+              className="rounded-b-none"
+            >
+              <Trophy className="h-4 w-4 mr-2" />
+              Standings
+            </Button>
+            <Button
+              variant={activeTab === 'matchups' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('matchups')}
+              className="rounded-b-none"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Matchups
+            </Button>
+            <Button
+              variant={activeTab === 'rosters' ? 'default' : 'ghost'}
+              onClick={() => {
+                setActiveTab('rosters')
+                setShowDetailedMatchups(true)
+              }}
+              className="rounded-b-none"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Rosters
+            </Button>
+            <Button
+              variant={activeTab === 'transactions' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('transactions')}
+              className="rounded-b-none"
+            >
+              <ArrowLeftRight className="h-4 w-4 mr-2" />
+              Transactions
+            </Button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'transactions' && transactionsData ? (
+          <Transactions
+            transactions={transactionsData.transactions}
+            stats={transactionsData.stats}
+            loading={loadingTransactions}
+            seasonId={leagueData.seasonId}
+            week={selectedWeek}
+            onWeekChange={setSelectedWeek}
+            availableWeeks={availableWeeks}
+          />
+        ) : activeTab === 'transactions' && !transactionsData && !loadingTransactions ? (
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center py-12 text-muted-foreground">
+                <ArrowLeftRight className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No transaction data available</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : activeTab !== 'transactions' && (
+          <>
+          {activeTab === 'standings' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Standings */}
           <div>
             <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center">
@@ -582,9 +682,10 @@ const League: React.FC = () => {
             </Card>
           </div>
         </div>
-
-        {/* Detailed Boxscore Data */}
-        {boxscoreData && boxscoreData.totalMatchups > 0 && (
+        )}
+        {(activeTab === 'rosters' || activeTab === 'matchups') && boxscoreData && boxscoreData.totalMatchups > 0 && (
+          <>
+          {/* Detailed Boxscore Data */}
           <div className="mt-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-foreground flex items-center">
@@ -701,6 +802,9 @@ const League: React.FC = () => {
               </Card>
             )}
           </div>
+          </>
+        )}
+          </>
         )}
 
         {/* Errors */}

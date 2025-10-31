@@ -11,6 +11,36 @@ const { getSlotLabel, SLOT, canSwapPositions } = require('../utils/slots');
 const { calculateOptimalLineup } = require('../utils/optimalLineupCalculator');
 // Track last sync time for each week (week -> timestamp)
 const lastSyncTimes = new Map();
+
+// Get league transactions
+router.get('/transactions', async (req, res) => {
+  try {
+    const { seasonId, scoringPeriodId } = req.query;
+    
+    // Get current config for default values
+    const config = await Config.getConfig();
+    const currentSeason = seasonId ? parseInt(seasonId) : (config.currentSeason || espnService.getCurrentNFLSeason());
+    const currentWeek = scoringPeriodId ? parseInt(scoringPeriodId) : null;
+
+    const result = await espnService.getTransactions(currentSeason, currentWeek);
+    
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.error,
+        requiresAuth: result.requiresAuth
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch transactions'
+    });
+  }
+});
 // Get league standings
 router.get('/standings', async (req, res) => {
   try {
