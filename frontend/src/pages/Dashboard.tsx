@@ -87,7 +87,11 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
         <div className="space-y-6">
             
             {/* Live Games */}
-            <LiveScoreStrip className="mb-6" isPollingActive={pollingStatus.isPolling} />
+            <LiveScoreStrip 
+              className="mb-6" 
+              isPollingActive={pollingStatus.isPolling}
+              onLiveGamesRefresh={syncCurrentWeekPlayers}
+            />
 
             {/* Highlights - Show when no live games (and not actively checking) */}
             {!checkingLiveGames && !hasLiveGames && (

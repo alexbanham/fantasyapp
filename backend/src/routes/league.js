@@ -20,7 +20,8 @@ router.get('/transactions', async (req, res) => {
     // Get current config for default values
     const config = await Config.getConfig();
     const currentSeason = seasonId ? parseInt(seasonId) : (config.currentSeason || espnService.getCurrentNFLSeason());
-    const currentWeek = scoringPeriodId ? parseInt(scoringPeriodId) : null;
+    // Allow null/undefined to fetch all transactions, or 'all' string
+    const currentWeek = scoringPeriodId && scoringPeriodId !== 'all' ? parseInt(scoringPeriodId) : null;
 
     const result = await espnService.getTransactions(currentSeason, currentWeek);
     
@@ -38,6 +39,41 @@ router.get('/transactions', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch transactions'
+    });
+  }
+});
+
+// Sync/refresh transactions (fetches fresh data from ESPN)
+router.post('/transactions/sync', async (req, res) => {
+  try {
+    const { seasonId, week } = req.body;
+    
+    // Get current config for default values
+    const config = await Config.getConfig();
+    const currentSeason = seasonId || config.currentSeason || espnService.getCurrentNFLSeason();
+    // If week is provided, use it; otherwise fetch all
+    const currentWeek = week !== undefined && week !== null && week !== 'all' ? parseInt(week) : null;
+
+    const result = await espnService.getTransactions(currentSeason, currentWeek);
+    
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.error,
+        requiresAuth: result.requiresAuth
+      });
+    }
+
+    res.json({
+      ...result,
+      synced: true,
+      syncedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error syncing transactions:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to sync transactions'
     });
   }
 });

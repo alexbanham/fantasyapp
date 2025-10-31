@@ -45,7 +45,7 @@ interface TransactionsProps {
 
 type FilterType = 'all' | 'TRADE_PROPOSAL' | 'TRADE_DECLINE' | 'TRADE_VETO' | 'WAIVER' | 'FREEAGENT' | 'ROSTER'
 type SortBy = 'date' | 'type' | 'team' | 'status'
-type ViewMode = 'list' | 'trades' | 'analytics'
+type ViewMode = 'trades' | 'analytics'
 
 const Transactions: React.FC<TransactionsProps> = ({
   transactions,
@@ -60,7 +60,8 @@ const Transactions: React.FC<TransactionsProps> = ({
   const [sortBy, setSortBy] = useState<SortBy>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [viewMode, setViewMode] = useState<ViewMode | null>(null) // null means show all transactions
+  const [weekFilter, setWeekFilter] = useState<number | null>(null) // null means show all weeks
 
   // Get transaction type label and icon
   const getTransactionTypeInfo = (type: string) => {
@@ -99,6 +100,11 @@ const Transactions: React.FC<TransactionsProps> = ({
   // Filter and sort transactions
   const filteredAndSorted = useMemo(() => {
     let filtered = transactions
+
+    // Filter by week
+    if (weekFilter !== null) {
+      filtered = filtered.filter(tx => tx.scoringPeriodId === weekFilter)
+    }
 
     // Filter by type
     if (filterType !== 'all') {
@@ -147,7 +153,7 @@ const Transactions: React.FC<TransactionsProps> = ({
     })
 
     return filtered
-  }, [transactions, filterType, sortBy, sortOrder, searchQuery])
+  }, [transactions, filterType, sortBy, sortOrder, searchQuery, weekFilter])
 
   // Get trade-only transactions
   const tradesOnly = useMemo(() => {
@@ -236,6 +242,37 @@ const Transactions: React.FC<TransactionsProps> = ({
             </SelectContent>
           </Select>
 
+          <Select 
+            value={weekFilter === null ? 'all' : weekFilter.toString()} 
+            onValueChange={(value) => setWeekFilter(value === 'all' ? null : parseInt(value))}
+          >
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <Calendar className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="All Weeks" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Weeks</SelectItem>
+              {availableWeeks.map((w) => (
+                <SelectItem key={w.week} value={w.week.toString()}>
+                  {w.label}
+                </SelectItem>
+              ))}
+              {/* Fallback: if availableWeeks is empty, use weeks from transactions */}
+              {availableWeeks.length === 0 && transactions.length > 0 && (() => {
+                const weeks = new Set(
+                  transactions
+                    .map(tx => tx.scoringPeriodId)
+                    .filter((w): w is number => w !== null && w !== undefined && w > 0)
+                )
+                return Array.from(weeks).sort((a, b) => a - b).map(w => (
+                  <SelectItem key={w} value={w.toString()}>
+                    Week {w}
+                  </SelectItem>
+                ))
+              })()}
+            </SelectContent>
+          </Select>
+
           <Button
             variant="outline"
             size="icon"
@@ -247,18 +284,18 @@ const Transactions: React.FC<TransactionsProps> = ({
 
         <div className="flex gap-2">
           <Button
-            variant={viewMode === 'list' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('list')}
-          >
-            List
-          </Button>
-          <Button
             variant={viewMode === 'trades' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setViewMode('trades')}
+            onClick={() => {
+              if (viewMode === 'trades') {
+                setViewMode(null) // Clicking again shows all
+              } else {
+                setViewMode('trades') // Apply trades filter
+              }
+            }}
           >
-            Trades
+            <ArrowLeftRight className="h-4 w-4 mr-2" />
+            {viewMode === 'trades' ? 'Show All' : 'Trades'}
           </Button>
           <Button
             variant={viewMode === 'analytics' ? 'default' : 'outline'}
@@ -409,12 +446,12 @@ const Transactions: React.FC<TransactionsProps> = ({
       )}
 
       {/* Transactions List */}
-      {(viewMode === 'list' || viewMode === 'trades') && (
+      {viewMode !== 'analytics' && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>
-                {viewMode === 'trades' ? 'Trades' : 'Transactions'} ({filteredAndSorted.length})
+                {viewMode === 'trades' ? 'Trades' : 'Transactions'} ({viewMode === 'trades' ? tradesOnly.length : filteredAndSorted.length})
               </CardTitle>
               {searchQuery && (
                 <Button
@@ -429,10 +466,10 @@ const Transactions: React.FC<TransactionsProps> = ({
             </div>
           </CardHeader>
           <CardContent>
-            {filteredAndSorted.length === 0 ? (
+            {(viewMode === 'trades' ? tradesOnly : filteredAndSorted).length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No transactions found</p>
+                <p>{viewMode === 'trades' ? 'No trades found' : 'No transactions found'}</p>
               </div>
             ) : (
               <div className="space-y-4">

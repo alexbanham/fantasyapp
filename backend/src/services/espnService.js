@@ -1556,14 +1556,61 @@ class ESPNService {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       };
 
-      const url = `${baseUrl}?view=mTransactions2`;
-      const response = await axios.get(url, { headers, timeout: 15000 });
+      let transactions = [];
+      const transactionMap = new Map(); // Use Map to deduplicate by transaction ID
 
-      let transactions = response.data.transactions || [];
+      // If scoringPeriodId is null, we need to fetch ALL transactions by querying week-by-week
+      // ESPN's mTransactions2 view without a week parameter only returns recent transactions
+      if (scoringPeriodId === null) {
+        // Get current week from config - only query weeks 1 through current week
+        // Transactions cannot exist past the current week
+        let currentWeek = this.getCurrentNFLWeek(); // Fallback to ESPN's calculated week
+        try {
+          const Config = require('../models/Config');
+          const config = await Config.getConfig();
+          if (config && config.currentWeek) {
+            currentWeek = config.currentWeek;
+          }
+        } catch (error) {
+          // If config lookup fails, use the calculated week
+          console.log('Could not load config for current week, using calculated week:', currentWeek);
+        }
+        const maxWeeks = Math.min(currentWeek, 18); // Cap at 18 for safety, but use current week
+        
+        const weekPromises = [];
 
-      // Filter by week if provided
-      if (scoringPeriodId !== null) {
-        transactions = transactions.filter(tx => tx.scoringPeriodId === scoringPeriodId);
+        for (let week = 1; week <= maxWeeks; week++) {
+          const url = `${baseUrl}?view=mTransactions2&scoringPeriodId=${week}`;
+          weekPromises.push(
+            axios.get(url, { headers, timeout: 10000 })
+              .then(response => {
+                const weekTransactions = response.data.transactions || [];
+                // Deduplicate by transaction ID (same transaction might appear in multiple weeks)
+                weekTransactions.forEach(tx => {
+                  if (tx.id && !transactionMap.has(tx.id)) {
+                    transactionMap.set(tx.id, tx);
+                  }
+                });
+                return weekTransactions.length;
+              })
+              .catch(error => {
+                // Silently handle errors for weeks that don't exist or have no transactions
+                // This is expected for future weeks or weeks with no activity
+                return 0;
+              })
+          );
+        }
+
+        // Wait for all week queries to complete
+        const results = await Promise.all(weekPromises);
+        transactions = Array.from(transactionMap.values());
+        
+        console.log(`Fetched transactions from weeks 1-${maxWeeks} (current week: ${currentWeek}), ${results.filter(count => count > 0).length} weeks with data, total: ${transactions.length} unique transactions`);
+      } else {
+        // Fetch specific week
+        const url = `${baseUrl}?view=mTransactions2&scoringPeriodId=${scoringPeriodId}`;
+        const response = await axios.get(url, { headers, timeout: 15000 });
+        transactions = response.data.transactions || [];
       }
 
       // Get league teams for mapping team IDs to names

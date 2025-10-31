@@ -16,6 +16,7 @@ import {
   getLeagueBoxscores,
   syncWeek,
   getLeagueTransactions,
+  syncLeagueTransactions,
   LeagueStanding,
   LeagueMatchup,
   LeagueInfo,
@@ -63,6 +64,8 @@ const League: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'standings' | 'matchups' | 'rosters' | 'transactions'>('standings')
   const [transactionsData, setTransactionsData] = useState<{ transactions: Transaction[], stats: TransactionStats } | null>(null)
   const [loadingTransactions, setLoadingTransactions] = useState(false)
+  const [transactionsViewMode, setTransactionsViewMode] = useState<'all' | 'week'>('all')
+  const [syncingTransactions, setSyncingTransactions] = useState(false)
 
   // Handle jumping to a team's detailed roster
   const handleJumpToTeam = (teamId: number) => {
@@ -132,7 +135,9 @@ const League: React.FC = () => {
   const fetchTransactions = async (week?: number | null) => {
     try {
       setLoadingTransactions(true)
-      const data = await getLeagueTransactions(leagueData?.seasonId, week || undefined)
+      // If view mode is 'all', pass null to get all transactions
+      const weekToFetch = transactionsViewMode === 'all' ? null : (week || undefined)
+      const data = await getLeagueTransactions(leagueData?.seasonId, weekToFetch)
       
       if (data.success) {
         setTransactionsData({
@@ -149,12 +154,41 @@ const League: React.FC = () => {
     }
   }
 
+  const handleSyncTransactions = async () => {
+    try {
+      setSyncingTransactions(true)
+      const weekToSync = transactionsViewMode === 'all' ? null : (selectedWeek || undefined)
+      const data = await syncLeagueTransactions(leagueData?.seasonId, weekToSync)
+      
+      if (data.success) {
+        setTransactionsData({
+          transactions: data.transactions || [],
+          stats: data.stats
+        })
+      }
+    } catch (err) {
+      console.error('Error syncing transactions:', err)
+    } finally {
+      setSyncingTransactions(false)
+    }
+  }
+
+  const handleTransactionsViewModeChange = (mode: 'all' | 'week') => {
+    setTransactionsViewMode(mode)
+    // Fetch transactions based on new mode
+    if (mode === 'all') {
+      fetchTransactions(null)
+    } else {
+      fetchTransactions(selectedWeek)
+    }
+  }
+
   const handleRefresh = async () => {
     setRefreshing(true)
     await Promise.all([
       fetchLeagueData(selectedWeek || undefined),
       fetchBoxscoreData(selectedWeek || undefined),
-      activeTab === 'transactions' ? fetchTransactions(selectedWeek || undefined) : Promise.resolve()
+      activeTab === 'transactions' ? fetchTransactions(transactionsViewMode === 'all' ? null : (selectedWeek || undefined)) : Promise.resolve()
     ])
   }
 
@@ -200,7 +234,7 @@ const League: React.FC = () => {
         await Promise.all([
           fetchLeagueData(selectedWeek),
           fetchBoxscoreData(selectedWeek),
-          activeTab === 'transactions' ? fetchTransactions(selectedWeek) : Promise.resolve()
+          activeTab === 'transactions' ? fetchTransactions(transactionsViewMode === 'all' ? null : selectedWeek) : Promise.resolve()
         ])
         
         // Check if we got data
@@ -230,10 +264,14 @@ const League: React.FC = () => {
 
   // Fetch transactions when tab changes
   useEffect(() => {
-    if (activeTab === 'transactions' && selectedWeek !== null) {
-      fetchTransactions(selectedWeek)
+    if (activeTab === 'transactions') {
+      if (transactionsViewMode === 'all') {
+        fetchTransactions(null)
+      } else {
+        fetchTransactions(selectedWeek)
+      }
     }
-  }, [activeTab])
+  }, [activeTab, transactionsViewMode, selectedWeek])
 
   // Handle scrolling to a team's detailed roster
   useEffect(() => {
@@ -507,15 +545,76 @@ const League: React.FC = () => {
 
         {/* Tab Content */}
         {activeTab === 'transactions' && transactionsData ? (
-          <Transactions
-            transactions={transactionsData.transactions}
-            stats={transactionsData.stats}
-            loading={loadingTransactions}
-            seasonId={leagueData.seasonId}
-            week={selectedWeek}
-            onWeekChange={setSelectedWeek}
-            availableWeeks={availableWeeks}
-          />
+          <div className="space-y-4">
+            {/* View Mode Toggle and Sync Button */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium">View:</span>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={transactionsViewMode === 'all' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => handleTransactionsViewModeChange('all')}
+                      >
+                        All Transactions
+                      </Button>
+                      <Button
+                        variant={transactionsViewMode === 'week' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => handleTransactionsViewModeChange('week')}
+                      >
+                        By Week
+                      </Button>
+                    </div>
+                    {transactionsViewMode === 'week' && (
+                      <Select
+                        value={selectedWeek?.toString() || ''}
+                        onValueChange={(value) => {
+                          const week = parseInt(value)
+                          setSelectedWeek(week)
+                          fetchTransactions(week)
+                        }}
+                      >
+                        <SelectTrigger className="w-[150px]">
+                          <SelectValue placeholder="Select week" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableWeeks.map((w) => (
+                            <SelectItem key={w.week} value={w.week.toString()}>
+                              {w.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSyncTransactions}
+                    disabled={syncingTransactions}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${syncingTransactions ? 'animate-spin' : ''}`} />
+                    {syncingTransactions ? 'Syncing...' : 'Sync Transactions'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            <Transactions
+              transactions={transactionsData.transactions}
+              stats={transactionsData.stats}
+              loading={loadingTransactions}
+              seasonId={leagueData.seasonId}
+              week={transactionsViewMode === 'all' ? null : selectedWeek}
+              onWeekChange={(week) => {
+                setSelectedWeek(week)
+                fetchTransactions(week)
+              }}
+              availableWeeks={availableWeeks}
+            />
+          </div>
         ) : activeTab === 'transactions' && !transactionsData && !loadingTransactions ? (
           <Card>
             <CardContent className="p-6">

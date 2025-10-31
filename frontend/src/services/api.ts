@@ -849,12 +849,25 @@ export interface TransactionsResponse {
   totalCount: number
 }
 
-export const getLeagueTransactions = async (seasonId?: number, week?: number): Promise<TransactionsResponse> => {
+export const getLeagueTransactions = async (seasonId?: number, week?: number | null): Promise<TransactionsResponse> => {
   const params = new URLSearchParams()
   if (seasonId) params.append('seasonId', seasonId.toString())
-  if (week) params.append('scoringPeriodId', week.toString())
+  if (week !== undefined && week !== null) {
+    params.append('scoringPeriodId', week.toString())
+  } else {
+    // Explicitly pass 'all' to fetch all transactions
+    params.append('scoringPeriodId', 'all')
+  }
   
   const response = await api.get(`/league/transactions?${params.toString()}`)
+  return response.data
+}
+
+export const syncLeagueTransactions = async (seasonId?: number, week?: number | null): Promise<TransactionsResponse> => {
+  const response = await api.post('/league/transactions/sync', {
+    seasonId,
+    week: week !== undefined && week !== null ? week : 'all'
+  })
   return response.data
 }
 

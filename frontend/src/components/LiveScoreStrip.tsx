@@ -56,9 +56,10 @@ interface Game {
 interface LiveScoreStripProps {
   className?: string
   isPollingActive?: boolean
+  onLiveGamesRefresh?: () => void | Promise<void>
 }
 
-const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreStripProps) => {
+const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRefresh }: LiveScoreStripProps) => {
   const [games, setGames] = useState<Game[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isOnline, setIsOnline] = useState(true)
@@ -70,6 +71,12 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
   const [loadingScorers, setLoadingScorers] = useState<Set<string>>(new Set())
   const expandedGamesRef = useRef<Set<string>>(new Set())
   const loadingScorersRef = useRef<Set<string>>(new Set())
+  const onLiveGamesRefreshRef = useRef(onLiveGamesRefresh)
+  
+  // Update ref when prop changes (doesn't cause re-render)
+  useEffect(() => {
+    onLiveGamesRefreshRef.current = onLiveGamesRefresh
+  }, [onLiveGamesRefresh])
 
   const fetchTopScorers = useCallback(async (gameId: string, forceRefresh = false) => {
     // Don't fetch if already loading, unless forcing refresh
@@ -154,6 +161,17 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
           setError(null)
           setIsOnline(true)
           
+          // Sync current week data to keep fantasy scorers up to date
+          if (onLiveGamesRefreshRef.current && newGames.length > 0) {
+            // Call the sync callback (fire and forget - don't block UI)
+            const syncResult = onLiveGamesRefreshRef.current()
+            if (syncResult instanceof Promise) {
+              syncResult.catch((err: unknown) => {
+                console.error('Error syncing current week during live games refresh:', err)
+              })
+            }
+          }
+          
           // Refresh top scorers for expanded games (force refresh on polling updates)
           expandedGamesRef.current.forEach(gameId => {
             fetchTopScorers(gameId, true)
@@ -175,7 +193,7 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
     // Only poll if polling is active
     let interval: NodeJSTimeout | null = null
     if (isPollingActive) {
-      interval = setInterval(fetchLiveGames, 15000)
+      interval = setInterval(fetchLiveGames, 30000) // Poll every 30 seconds
     }
 
     return () => {
@@ -183,7 +201,7 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
         clearInterval(interval)
       }
     }
-  }, [isPollingActive, fetchTopScorers])
+  }, [isPollingActive, fetchTopScorers]) // Only re-run when polling status changes or fetchTopScorers changes
 
   const toggleGameExpansion = (gameId: string) => {
     setExpandedGames(prev => {
@@ -273,9 +291,20 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
         const gamesData = await gamesResponse.json()
         
         if (gamesData.success) {
-          setGames(gamesData.games || [])
+          const newGames = gamesData.games || []
+          setGames(newGames)
           setLastUpdated(new Date())
           setError(null)
+          
+          // Sync current week data to keep fantasy scorers up to date
+          if (onLiveGamesRefreshRef.current && newGames.length > 0) {
+            const syncResult = onLiveGamesRefreshRef.current()
+            if (syncResult instanceof Promise) {
+              syncResult.catch((err: unknown) => {
+                console.error('Error syncing current week during manual refresh:', err)
+              })
+            }
+          }
         }
       }
     } catch (err) {
@@ -713,7 +742,7 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false }: LiveScoreSt
                 </span>
                 <span className="flex items-center space-x-1">
                   <RefreshCw className="h-3 w-3" />
-                  <span>{isPollingActive ? 'Auto-refresh every 15s' : 'Manual refresh only'}</span>
+                  <span>{isPollingActive ? 'Auto-refresh every 30s' : 'Manual refresh only'}</span>
                 </span>
               </div>
               <div className="flex items-center space-x-1">
