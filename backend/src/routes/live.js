@@ -486,8 +486,8 @@ router.get('/highlights', async (req, res) => {
     
     // Sort by points and get top 3
     topScorers.sort((a, b) => b.points - a.points);
+    const topThree = topScorers.slice(0, 3);
     if (process.env.NODE_ENV === 'development') {
-      const topThree = topScorers.slice(0, 3);
       console.log(`[HIGHLIGHTS] Top 3 scorers:`, topThree.map(p => `${p.name}: ${p.points}`));
     }
     
@@ -622,8 +622,8 @@ router.get('/highlights', async (req, res) => {
     
     // Sort by over-projection percentage and get top 2
     boomingPlayers.sort((a, b) => b.percentageOver - a.percentageOver);
+    const topBooms = boomingPlayers.slice(0, 2);
     if (process.env.NODE_ENV === 'development') {
-      const topBooms = boomingPlayers.slice(0, 2);
       console.log(`[HIGHLIGHTS] Top booms:`, topBooms.map(p => `${p.name}: +${p.percentageOver.toFixed(1)}%`));
     }
     
@@ -682,8 +682,8 @@ router.get('/highlights', async (req, res) => {
     
     // Sort by under-projection percentage and get top 2
     bustingPlayers.sort((a, b) => b.percentageUnder - a.percentageUnder);
+    const topBusts = bustingPlayers.slice(0, 2);
     if (process.env.NODE_ENV === 'development') {
-      const topBusts = bustingPlayers.slice(0, 2);
       console.log(`[HIGHLIGHTS] Top busts:`, topBusts.map(p => `${p.name}: -${p.percentageUnder.toFixed(1)}%`));
     }
     
