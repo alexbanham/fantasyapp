@@ -35,7 +35,9 @@ router.get('/transactions', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error fetching transactions:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error fetching transactions:', error);
+    }
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch transactions'
@@ -70,7 +72,9 @@ router.post('/transactions/sync', async (req, res) => {
       syncedAt: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error syncing transactions:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error syncing transactions:', error);
+    }
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to sync transactions'
@@ -412,18 +416,102 @@ router.get('/overview', async (req, res) => {
       }
       return b.pointsFor - a.pointsFor;
     });
+    
+    // Calculate playoff odds for each team (with error handling)
+    let standingsWithOdds = standings;
+    // Define these outside try-catch so they're available for leagueInfo
+    const playoffTeams = comprehensiveResult.leagueSettings?.playoffTeamCount || Math.floor((comprehensiveResult.totalTeams || standings.length) / 2);
+    const regularSeasonWeeks = comprehensiveResult.leagueSettings?.regularSeasonLength || 13;
+    
+    try {
+      const gamesPlayed = requestedWeek - 1; // Assuming week 1 is the start
+      const gamesRemaining = Math.max(0, regularSeasonWeeks - gamesPlayed);
+      
+      // Calculate playoff odds based on current position and remaining games
+      const calculatePlayoffOdds = (team, index) => {
+        try {
+          // If season is over or playoffs have started, return based on current seed
+          if (gamesRemaining === 0) {
+            return index < playoffTeams ? 100 : 0;
+          }
+          
+          // If we're already in playoffs position with games remaining
+          if (index < playoffTeams) {
+            // Higher odds if we're well ahead
+            const gamesAheadOfCutoff = playoffTeams - index;
+            if (gamesAheadOfCutoff >= 2) {
+              return Math.min(95, 70 + (gamesAheadOfCutoff * 10));
+            }
+            // Good position but need to maintain
+            return Math.min(85, 60 + (gamesAheadOfCutoff * 15));
+          }
+          
+          // If we're just outside playoffs
+          if (index === playoffTeams) {
+            // Good chance if we're close
+            return 45;
+          }
+          
+          // Calculate how far behind we are
+          const teamsAhead = index - playoffTeams + 1;
+          // Safely get the cutoff team's record (the last team in playoffs)
+          const cutoffIndex = Math.min(playoffTeams - 1, standings.length - 1);
+          const cutoffTeam = standings[cutoffIndex];
+          if (!cutoffTeam) {
+            return 0; // Can't calculate if no cutoff team
+          }
+          const gamesBehind = Math.max(0, (cutoffTeam.wins + cutoffTeam.losses) - (team.wins + team.losses));
+          
+          // If we're too far behind
+          if (gamesBehind > gamesRemaining) {
+            return Math.max(0, 5);
+          }
+          
+          // If we're 1-2 games behind
+          if (gamesBehind <= 2 && teamsAhead <= 2) {
+            return Math.max(15, 40 - (teamsAhead * 10) - (gamesBehind * 5));
+          }
+          
+          // If we're 3+ games behind or many teams ahead
+          if (gamesBehind <= gamesRemaining && teamsAhead <= 3) {
+            return Math.max(5, 25 - (teamsAhead * 5) - (gamesBehind * 3));
+          }
+          
+          // Very low odds
+          return Math.max(0, 10 - (teamsAhead * 2) - (gamesBehind * 2));
+        } catch (err) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error calculating playoff odds for team:', team.teamId, err);
+          }
+          return 0; // Default to 0 on error
+        }
+      };
+      
+      // Add playoff odds to each team
+      standingsWithOdds = standings.map((team, index) => ({
+        ...team,
+        playoffOdds: calculatePlayoffOdds(team, index)
+      }));
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error calculating playoff odds:', err);
+      }
+      // If calculation fails, just use standings without odds
+      standingsWithOdds = standings;
+    }
+    
     // Process league info from comprehensive data
     const leagueInfo = {
-      leagueId: comprehensiveResult.leagueInfo.leagueId,
-      leagueName: comprehensiveResult.leagueInfo.leagueName,
-      seasonId: comprehensiveResult.leagueInfo.seasonId,
+      leagueId: comprehensiveResult.leagueInfo?.leagueId,
+      leagueName: comprehensiveResult.leagueInfo?.leagueName,
+      seasonId: comprehensiveResult.leagueInfo?.seasonId,
       totalTeams: comprehensiveResult.totalTeams,
-      playoffTeams: comprehensiveResult.leagueSettings.playoffTeamCount || 0,
-      regularSeasonWeeks: comprehensiveResult.leagueSettings.regularSeasonLength || 13,
+      playoffTeams: playoffTeams,
+      regularSeasonWeeks: regularSeasonWeeks,
       playoffWeeks: 3, // Default playoff weeks
-      scoringType: comprehensiveResult.leagueSettings.playerRankType || 'standard',
-      tradeDeadline: comprehensiveResult.leagueSettings.tradeDeadline || null,
-      waiverRule: comprehensiveResult.leagueSettings.waiverRule || 'none'
+      scoringType: comprehensiveResult.leagueSettings?.playerRankType || 'standard',
+      tradeDeadline: comprehensiveResult.leagueSettings?.tradeDeadline || null,
+      waiverRule: comprehensiveResult.leagueSettings?.waiverRule || 'none'
     };
     const response = {
       success: true,
@@ -431,22 +519,29 @@ router.get('/overview', async (req, res) => {
       week: requestedWeek,
       actualWeekShown: comprehensiveResult.actualWeekShown,
       isShowingPreviousWeek: comprehensiveResult.isShowingPreviousWeek,
-      standings,
+      standings: standingsWithOdds,
       matchups,
       leagueInfo,
       errors: []
     };
     res.json(response);
   } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error in /overview endpoint:', error);
+      console.error('Error stack:', error.stack);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to fetch league overview',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred while fetching league data'
     });
   }
 });
-// Debug endpoint to see raw ESPN data
+// Debug endpoint to see raw ESPN data (development only)
 router.get('/debug', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ success: false, error: 'Not found' });
+  }
   try {
     const { seasonId, scoringPeriodId } = req.query;
     // Get current config for default values
@@ -474,8 +569,11 @@ router.get('/debug', async (req, res) => {
     });
   }
 });
-// Simple debug endpoint to see team structure
+// Simple debug endpoint to see team structure (development only)
 router.get('/team-debug', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ success: false, error: 'Not found' });
+  }
   try {
     const config = await Config.getConfig();
     const currentSeason = config.currentSeason || espnService.getCurrentNFLSeason();
@@ -749,15 +847,31 @@ router.get('/boxscores', async (req, res) => {
         teamMap.set(t.team_id, { name: t.team_name, logo: t.logo });
       }
     });
-    // Also get team data from ESPN as fallback
+    // Also get team data from ESPN as fallback and primary source
     const comprehensiveResult = await espnService.getComprehensiveLeagueData(season, weekNum);
     if (comprehensiveResult.success && comprehensiveResult.teams) {
       comprehensiveResult.teams.forEach(team => {
-        // Only add to map if we don't already have a name for this team
-        if (!teamMap.has(team.teamId)) {
-          teamMap.set(team.teamId, { 
-            name: team.name, 
-            logo: team.logo 
+        // Always update from ESPN data (it's more reliable)
+        teamMap.set(team.teamId, { 
+          name: team.name, 
+          logo: team.logo 
+        });
+      });
+    }
+    
+    // Also get team names from matchups in comprehensive result (more reliable source)
+    if (comprehensiveResult.success && comprehensiveResult.matchups) {
+      comprehensiveResult.matchups.forEach(matchup => {
+        if (matchup.awayTeam) {
+          teamMap.set(matchup.awayTeam.teamId, {
+            name: matchup.awayTeam.teamName,
+            logo: matchup.awayTeam.teamLogo
+          });
+        }
+        if (matchup.homeTeam) {
+          teamMap.set(matchup.homeTeam.teamId, {
+            name: matchup.homeTeam.teamName,
+            logo: matchup.homeTeam.teamLogo
           });
         }
       });
@@ -795,64 +909,213 @@ router.get('/boxscores', async (req, res) => {
             team_id: matchup.away_team_id
           }).lean()
         ]);
-        // Separate starters and bench, sort by points
-        const homeStarters = homeRoster
-          .filter(p => p.is_starter)
-          .sort((a, b) => b.points_actual - a.points_actual);
+        
+        // Get all player IDs to lookup their pro_team_id
+        const allPlayerIds = new Set();
+        homeRoster.forEach(p => allPlayerIds.add(p.player_id));
+        awayRoster.forEach(p => allPlayerIds.add(p.player_id));
+        
+        // Get player info (pro_team_id) from ESPNPlayer collection
+        const ESPNPlayer = require('../models/ESPNPlayer');
+        const players = await ESPNPlayer.find({
+          espn_id: { $in: Array.from(allPlayerIds) }
+        }).select('espn_id pro_team_id').lean();
+        
+        const playerTeamMap = new Map();
+        players.forEach(p => {
+          playerTeamMap.set(p.espn_id, p.pro_team_id);
+        });
+        
+        // Get all games for this week to check player game status
+        const Game = require('../models/Game');
+        const games = await Game.find({
+          season,
+          week: weekNum
+        }).lean();
+        
+        // Create a map of team abbreviation to game status
+        const teamGameStatusMap = new Map();
+        games.forEach(game => {
+          if (game.homeTeam?.abbreviation && game.status) {
+            teamGameStatusMap.set(game.homeTeam.abbreviation, {
+              status: game.status,
+              isLive: game.isLive || false
+            });
+          }
+          if (game.awayTeam?.abbreviation && game.status) {
+            teamGameStatusMap.set(game.awayTeam.abbreviation, {
+              status: game.status,
+              isLive: game.isLive || false
+            });
+          }
+        });
+        
+        // Helper function to get player game status
+        const getPlayerGameStatus = (playerId) => {
+          const proTeamId = playerTeamMap.get(playerId);
+          if (!proTeamId) return { status: 'unknown', hasPlayed: false, isPlaying: false };
+          
+          const gameStatus = teamGameStatusMap.get(proTeamId);
+          if (!gameStatus) return { status: 'unknown', hasPlayed: false, isPlaying: false };
+          
+          const hasPlayed = gameStatus.status === 'STATUS_FINAL';
+          const isPlaying = gameStatus.status === 'STATUS_IN' || gameStatus.status === 'STATUS_HALFTIME';
+          const notPlayed = gameStatus.status === 'STATUS_SCHEDULED' || gameStatus.status === 'STATUS_PRE';
+          
+          return {
+            status: gameStatus.status,
+            hasPlayed,
+            isPlaying,
+            notPlayed,
+            proTeamId
+          };
+        };
+        
+        // Helper function to validate and sort starters properly
+        const SLOT = require('../utils/slots').SLOT;
+        const validateAndSortStarters = (roster) => {
+          // Filter to only valid starter positions (exclude BENCH=20 and IR=21)
+          const validStarters = roster.filter(p => {
+            if (!p.is_starter) return false;
+            const slotId = p.lineup_slot_id;
+            return slotId !== 20 && slotId !== 21; // Exclude BENCH and IR
+          });
+          
+          // Group by position
+          const qbs = validStarters.filter(p => p.lineup_slot_id === SLOT.QB);
+          const rbs = validStarters.filter(p => p.lineup_slot_id === SLOT.RB);
+          const wrs = validStarters.filter(p => p.lineup_slot_id === SLOT.WR);
+          const tes = validStarters.filter(p => p.lineup_slot_id === SLOT.TE);
+          const flexes = validStarters.filter(p => p.lineup_slot_id === SLOT.FLEX);
+          const ks = validStarters.filter(p => p.lineup_slot_id === SLOT.K);
+          const dsts = validStarters.filter(p => p.lineup_slot_id === SLOT.DST);
+          
+          // Sort each group by points (descending)
+          qbs.sort((a, b) => (b.points_actual || 0) - (a.points_actual || 0));
+          rbs.sort((a, b) => (b.points_actual || 0) - (a.points_actual || 0));
+          wrs.sort((a, b) => (b.points_actual || 0) - (a.points_actual || 0));
+          tes.sort((a, b) => (b.points_actual || 0) - (a.points_actual || 0));
+          flexes.sort((a, b) => (b.points_actual || 0) - (a.points_actual || 0));
+          ks.sort((a, b) => (b.points_actual || 0) - (a.points_actual || 0));
+          dsts.sort((a, b) => (b.points_actual || 0) - (a.points_actual || 0));
+          
+          // Take only the required number of each position
+          // Standard lineup: 1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 K, 1 D/ST
+          // Order: QB, RB1, RB2, WR1, WR2, TE, FLEX, K, D/ST
+          const validatedStarters = [];
+          
+          // QB (1 required)
+          if (qbs.length > 0) validatedStarters.push(qbs[0]);
+          
+          // RB (2 required, but take up to 2)
+          validatedStarters.push(...rbs.slice(0, 2));
+          
+          // WR (2 required, but take up to 2)
+          validatedStarters.push(...wrs.slice(0, 2));
+          
+          // TE (1 required)
+          if (tes.length > 0) validatedStarters.push(tes[0]);
+          
+          // FLEX (1 required, but take up to 1)
+          if (flexes.length > 0) validatedStarters.push(flexes[0]);
+          
+          // K (1 required)
+          if (ks.length > 0) validatedStarters.push(ks[0]);
+          
+          // D/ST (1 required)
+          if (dsts.length > 0) validatedStarters.push(dsts[0]);
+          
+          return validatedStarters;
+        };
+        
+        // Separate starters and bench
+        const homeStarters = validateAndSortStarters(homeRoster);
         const homeBench = homeRoster
-          .filter(p => !p.is_starter)
-          .sort((a, b) => b.points_actual - a.points_actual);
-        const awayStarters = awayRoster
-          .filter(p => p.is_starter)
-          .sort((a, b) => b.points_actual - a.points_actual);
+          .filter(p => !p.is_starter || p.lineup_slot_id === 20 || p.lineup_slot_id === 21)
+          .sort((a, b) => (b.points_actual || 0) - (a.points_actual || 0));
+        const awayStarters = validateAndSortStarters(awayRoster);
         const awayBench = awayRoster
-          .filter(p => !p.is_starter)
-          .sort((a, b) => b.points_actual - a.points_actual);
+          .filter(p => !p.is_starter || p.lineup_slot_id === 20 || p.lineup_slot_id === 21)
+          .sort((a, b) => (b.points_actual || 0) - (a.points_actual || 0));
         return {
           matchupId: matchup.matchup_id,
           homeTeam: {
             teamId: matchup.home_team_id,
             teamName: teamMap.get(matchup.home_team_id)?.name || `Team ${matchup.home_team_id}`,
+            logo: teamMap.get(matchup.home_team_id)?.logo || null,
             totalActual: homeTotals?.total_actual || 0,
             totalProjected: homeTotals?.total_projected || 0,
-            starters: homeStarters.map(p => ({
-              playerId: p.player_id,
-              fullName: p.full_name,
-              position: p.lineup_slot_id,
-              pointsActual: p.points_actual,
-              pointsProjected: p.points_projected,
-              isStarter: p.is_starter
-            })),
-            bench: homeBench.map(p => ({
-              playerId: p.player_id,
-              fullName: p.full_name,
-              position: p.lineup_slot_id,
-              pointsActual: p.points_actual,
-              pointsProjected: p.points_projected,
-              isStarter: p.is_starter
-            }))
+            starters: homeStarters.map(p => {
+              const gameStatus = getPlayerGameStatus(p.player_id);
+              return {
+                playerId: p.player_id,
+                fullName: p.full_name,
+                position: p.lineup_slot_id,
+                pointsActual: p.points_actual,
+                pointsProjected: p.points_projected,
+                isStarter: p.is_starter,
+                gameStatus: gameStatus.status,
+                hasPlayed: gameStatus.hasPlayed,
+                isPlaying: gameStatus.isPlaying,
+                notPlayed: gameStatus.notPlayed,
+                proTeamId: gameStatus.proTeamId
+              };
+            }),
+            bench: homeBench.map(p => {
+              const gameStatus = getPlayerGameStatus(p.player_id);
+              return {
+                playerId: p.player_id,
+                fullName: p.full_name,
+                position: p.lineup_slot_id,
+                pointsActual: p.points_actual,
+                pointsProjected: p.points_projected,
+                isStarter: p.is_starter,
+                gameStatus: gameStatus.status,
+                hasPlayed: gameStatus.hasPlayed,
+                isPlaying: gameStatus.isPlaying,
+                notPlayed: gameStatus.notPlayed,
+                proTeamId: gameStatus.proTeamId
+              };
+            })
           },
           awayTeam: {
             teamId: matchup.away_team_id,
             teamName: teamMap.get(matchup.away_team_id)?.name || `Team ${matchup.away_team_id}`,
+            logo: teamMap.get(matchup.away_team_id)?.logo || null,
             totalActual: awayTotals?.total_actual || 0,
             totalProjected: awayTotals?.total_projected || 0,
-            starters: awayStarters.map(p => ({
-              playerId: p.player_id,
-              fullName: p.full_name,
-              position: p.lineup_slot_id,
-              pointsActual: p.points_actual,
-              pointsProjected: p.points_projected,
-              isStarter: p.is_starter
-            })),
-            bench: awayBench.map(p => ({
-              playerId: p.player_id,
-              fullName: p.full_name,
-              position: p.lineup_slot_id,
-              pointsActual: p.points_actual,
-              pointsProjected: p.points_projected,
-              isStarter: p.is_starter
-            }))
+            starters: awayStarters.map(p => {
+              const gameStatus = getPlayerGameStatus(p.player_id);
+              return {
+                playerId: p.player_id,
+                fullName: p.full_name,
+                position: p.lineup_slot_id,
+                pointsActual: p.points_actual,
+                pointsProjected: p.points_projected,
+                isStarter: p.is_starter,
+                gameStatus: gameStatus.status,
+                hasPlayed: gameStatus.hasPlayed,
+                isPlaying: gameStatus.isPlaying,
+                notPlayed: gameStatus.notPlayed,
+                proTeamId: gameStatus.proTeamId
+              };
+            }),
+            bench: awayBench.map(p => {
+              const gameStatus = getPlayerGameStatus(p.player_id);
+              return {
+                playerId: p.player_id,
+                fullName: p.full_name,
+                position: p.lineup_slot_id,
+                pointsActual: p.points_actual,
+                pointsProjected: p.points_projected,
+                isStarter: p.is_starter,
+                gameStatus: gameStatus.status,
+                hasPlayed: gameStatus.hasPlayed,
+                isPlaying: gameStatus.isPlaying,
+                notPlayed: gameStatus.notPlayed,
+                proTeamId: gameStatus.proTeamId
+              };
+            })
           }
         };
       })
@@ -1429,13 +1692,10 @@ router.get('/analytics/team/:teamId/weekly-breakdown', async (req, res) => {
       const weekTotal = teamTotals.find(t => t.week === weekData.week);
       // Calculate actual score as sum of all starter points (apples to apples with optimal)
       const actualScore = starters.reduce((sum, p) => sum + (p.points_actual || 0), 0);
-      // Debug: Show what players we have
-      // Debug: Check for kickers in the data
       const kickersInData = players.filter(p => p.default_pos_id === 17);
       // Calculate optimal lineup using dedicated utility
       const optimalResult = calculateOptimalLineup(players);
-      const optimalScore = optimalResult.score;
-      // Debug: show actual lineup vs what optimal would be  
+      const optimalScore = optimalResult.score;  
       // Show optimal lineup details
       const sel = optimalResult.selected;
       // Find points left on bench
@@ -1586,7 +1846,6 @@ router.get('/analytics/team/:teamId/weekly-breakdown', async (req, res) => {
       }
       // Sort optimal lineup by points descending
       optimalLineup.sort((a, b) => b.points - a.points);
-      // Debug: Log the optimal lineup composition
       // Recalculate optimal score from the optimalLineup array to ensure accuracy
       const recalculatedOptimalScore = optimalLineup.reduce((sum, p) => sum + p.points, 0);
       // Recalculate efficiency with the correct optimal score

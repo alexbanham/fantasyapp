@@ -4,21 +4,28 @@ import { Trophy, TrendingUp, Zap, Flame, Users, Target } from 'lucide-react'
 import { getTeamLogoWithFallback } from '../../lib/teamLogos'
 import { getGameHighlights } from '../../services/api'
 
-interface FantasyMatchup {
-  matchupId: number
-  awayTeam: {
-    teamId: number
-    teamName: string
-    score: number
-  }
-  homeTeam: {
-    teamId: number
-    teamName: string
-    score: number
-  }
-  scoreDiff: number
-  matchupType: 'close' | 'blowout' | 'low_scoring' | 'high_scoring' | 'competitive'
+interface ImpactfulBoomBust {
+  espn_id: string
+  name: string
+  position: string
+  pro_team_id?: string
+  headshot_url?: string
   week: number
+  actualPoints: number
+  projectedPoints: number
+  overProjection: number
+  percentageOver: number
+  roster_status: string
+  fantasy_team_name?: string | null
+  fantasy_team_id?: number
+  opponent_team_name?: string
+  opponent_team_id?: number
+  winProbImpact: number
+  projectedTotalImpact?: number // Impact on team's projected total as percentage
+  playerImpactPoints?: number // Raw point impact
+  isBoom: boolean
+  projectedWinProb: number
+  actualWinProb: number
 }
 
 interface Highlight {
@@ -29,7 +36,7 @@ interface Highlight {
     upsets: GameUpset[]
     boomingPlayers: BoomingPlayer[]
     bustingPlayers: BoomingPlayer[]
-    fantasyMatchups: FantasyMatchup[]
+    impactfulBoomsBusts: ImpactfulBoomBust[]
   }
 }
 
@@ -93,9 +100,11 @@ interface BoomingPlayer {
 
 interface GameHighlightsProps {
   className?: string
+  week?: number
+  season?: number
 }
 
-const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '' }) => {
+const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, season }) => {
   const [highlights, setHighlights] = useState<Highlight | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -104,7 +113,7 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '' }) => {
     const fetchHighlights = async () => {
       try {
         setIsLoading(true)
-        const response = await getGameHighlights()
+        const response = await getGameHighlights(week, season)
         
         if (response.success) {
           setHighlights(response)
@@ -120,7 +129,7 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '' }) => {
     }
 
     fetchHighlights()
-  }, [])
+  }, [week, season])
 
   if (isLoading) {
     return (
@@ -197,7 +206,22 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '' }) => {
 
                     {/* Player Info */}
                     <div className="flex items-center space-x-1.5 flex-1">
-                      {player.headshot_url ? (
+                      {/* D/ST players: use team logo */}
+                      {(player.position === 'DST' || player.position === 'D/ST') && player.pro_team_id ? (
+                        <img 
+                          src={getTeamLogoWithFallback(player.pro_team_id)} 
+                          alt={player.name}
+                          className="w-6 h-6 rounded-full object-cover border border-border/30"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = '<div class="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500/20 to-yellow-500/20 border border-orange-500/30 flex items-center justify-center"><span class="text-[10px] font-bold text-orange-300">' + player.name.charAt(0) + '</span></div>';
+                            }
+                          }}
+                        />
+                      ) : player.headshot_url ? (
                         <img 
                           src={player.headshot_url} 
                           alt={player.name}
@@ -214,6 +238,11 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '' }) => {
                           <span className="text-xs font-semibold text-foreground truncate">{player.name}</span>
                           <span className="text-[10px] text-muted-foreground">{player.position}</span>
                         </div>
+                        {player.fantasy_team_name && (
+                          <div className="text-[10px] text-muted-foreground truncate mt-0.5">
+                            {player.fantasy_team_name}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -247,7 +276,22 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '' }) => {
                       </div>
 
                       <div className="flex items-center space-x-1.5 flex-1">
-                        {player.headshot_url ? (
+                        {/* D/ST players: use team logo */}
+                        {(player.position === 'DST' || player.position === 'D/ST') && player.pro_team_id ? (
+                          <img 
+                            src={getTeamLogoWithFallback(player.pro_team_id)} 
+                            alt={player.name}
+                            className="w-6 h-6 rounded-full object-cover border border-border/30"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = '<div class="w-6 h-6 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/30 flex items-center justify-center"><span class="text-[10px] font-bold text-green-300">' + player.name.charAt(0) + '</span></div>';
+                              }
+                            }}
+                          />
+                        ) : player.headshot_url ? (
                           <img 
                             src={player.headshot_url} 
                             alt={player.name}
@@ -300,7 +344,22 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '' }) => {
                         </div>
 
                         <div className="flex items-center space-x-1.5 flex-1">
-                          {player.headshot_url ? (
+                          {/* D/ST players: use team logo */}
+                          {(player.position === 'DST' || player.position === 'D/ST') && player.pro_team_id ? (
+                            <img 
+                              src={getTeamLogoWithFallback(player.pro_team_id)} 
+                              alt={player.name}
+                              className="w-6 h-6 rounded-full object-cover border border-border/30"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  parent.innerHTML = '<div class="w-6 h-6 rounded-full bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/30 flex items-center justify-center"><span class="text-[10px] font-bold text-red-300">' + player.name.charAt(0) + '</span></div>';
+                                }
+                              }}
+                            />
+                          ) : player.headshot_url ? (
                             <img 
                               src={player.headshot_url} 
                               alt={player.name}
@@ -327,7 +386,7 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '' }) => {
                       </div>
 
                       <div className="flex items-center bg-red-500/10 px-2 py-1 rounded-full border border-red-500/20 ml-1">
-                        <span className="text-xs font-bold text-red-400">-{((player.actualPoints - player.projectedPoints) / player.projectedPoints * 100).toFixed(0)}%</span>
+                        <span className="text-xs font-bold text-red-400">-{Math.abs(((player.actualPoints - player.projectedPoints) / player.projectedPoints * 100)).toFixed(0)}%</span>
                       </div>
                     </div>
                   ))}
@@ -336,45 +395,105 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '' }) => {
             )}
           </div>
 
-          {/* Column 2: League Games */}
-            {/* Fantasy Matchups */}
-            {highlights.data.fantasyMatchups && highlights.data.fantasyMatchups.length > 0 && (
+          {/* Column 2: Impactful Booms/Busts */}
+            {highlights.data.impactfulBoomsBusts && highlights.data.impactfulBoomsBusts.length > 0 && (
               <div>
                 <div className="flex items-center space-x-2 mb-2">
-                  <Users className="h-4 w-4 text-purple-400" />
-                  <h4 className="text-xs font-semibold text-foreground">League Games</h4>
+                  <Zap className="h-4 w-4 text-purple-400" />
+                  <h4 className="text-xs font-semibold text-foreground">Impactful Booms / Busts</h4>
                 </div>
                 <div className="space-y-1.5">
-                  {highlights.data.fantasyMatchups.map((matchup) => (
+                  {highlights.data.impactfulBoomsBusts.map((player) => (
                     <div 
-                      key={matchup.matchupId}
-                      className="p-2 rounded-lg border border-border/20 bg-gradient-to-r from-purple-500/5 to-blue-500/5"
+                      key={`impact-${player.espn_id}`}
+                      className={`p-2 rounded-lg border border-border/20 ${
+                        player.isBoom 
+                          ? 'bg-gradient-to-r from-green-500/5 to-emerald-500/5' 
+                          : 'bg-gradient-to-r from-red-500/5 to-orange-500/5'
+                      }`}
                     >
-                      {/* Scores */}
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs truncate flex-1">{matchup.awayTeam.teamName}</span>
-                        <span className="text-sm font-bold">{matchup.awayTeam.score.toFixed(1)}</span>
-                      </div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs truncate flex-1">{matchup.homeTeam.teamName}</span>
-                        <span className="text-sm font-bold">{matchup.homeTeam.score.toFixed(1)}</span>
+                      {/* Player Info */}
+                      <div className="flex items-center space-x-2 mb-2">
+                        {/* D/ST players: use team logo */}
+                        {(player.position === 'DST' || player.position === 'D/ST') && player.pro_team_id ? (
+                          <img 
+                            src={getTeamLogoWithFallback(player.pro_team_id)} 
+                            alt={player.name}
+                            className="w-6 h-6 rounded-full object-cover border border-border/30"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = `<div class="w-6 h-6 rounded-full border flex items-center justify-center ${
+                                  player.isBoom 
+                                    ? 'bg-gradient-to-br from-green-500/20 to-emerald-500/20 border-green-500/30' 
+                                    : 'bg-gradient-to-br from-red-500/20 to-orange-500/20 border-red-500/30'
+                                }"><span class="text-[10px] font-bold">${player.name.charAt(0)}</span></div>`;
+                              }
+                            }}
+                          />
+                        ) : player.headshot_url ? (
+                          <img 
+                            src={player.headshot_url} 
+                            alt={player.name}
+                            className="w-6 h-6 rounded-full object-cover border border-border/30"
+                          />
+                        ) : (
+                          <div className={`w-6 h-6 rounded-full border flex items-center justify-center ${
+                            player.isBoom 
+                              ? 'bg-gradient-to-br from-green-500/20 to-emerald-500/20 border-green-500/30' 
+                              : 'bg-gradient-to-br from-red-500/20 to-orange-500/20 border-red-500/30'
+                          }`}>
+                            <span className="text-[10px] font-bold">{player.name.charAt(0)}</span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-1">
+                            <span className="text-xs font-semibold text-foreground truncate">{player.name}</span>
+                            <span className="text-[10px] text-muted-foreground">{player.position}</span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground truncate">
+                            {player.fantasy_team_name}
+                          </div>
+                        </div>
                       </div>
                       
-                      {/* Matchup Type Badge */}
+                      {/* Matchup Info */}
+                      <div className="mb-2 pt-2 border-t border-border/20">
+                        <div className="text-[10px] text-muted-foreground mb-1">vs {player.opponent_team_name}</div>
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-muted-foreground">
+                            {player.projectedWinProb.toFixed(1)}% → {player.actualWinProb.toFixed(1)}%
+                          </span>
+                          <span className={`font-semibold ${
+                            player.projectedTotalImpact !== undefined && player.projectedTotalImpact > 0 
+                              ? 'text-green-400' 
+                              : player.projectedTotalImpact !== undefined && player.projectedTotalImpact < 0
+                              ? 'text-red-400'
+                              : player.winProbImpact > 0 
+                              ? 'text-green-400' 
+                              : 'text-red-400'
+                          }`}>
+                            {player.projectedTotalImpact !== undefined 
+                              ? (player.projectedTotalImpact > 0 ? '+' : '') + player.projectedTotalImpact.toFixed(1) + '%'
+                              : (player.winProbImpact > 0 ? '+' : '') + player.winProbImpact.toFixed(1) + '%'
+                            }
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Points */}
                       <div className="flex items-center justify-between text-[10px]">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                          matchup.matchupType === 'close' ? 'bg-yellow-500/20 text-yellow-400' :
-                          matchup.matchupType === 'blowout' ? 'bg-red-500/20 text-red-400' :
-                          matchup.matchupType === 'low_scoring' ? 'bg-blue-500/20 text-blue-400' :
-                          matchup.matchupType === 'high_scoring' ? 'bg-green-500/20 text-green-400' :
-                          'bg-purple-500/20 text-purple-400'
+                        <div className="flex items-center space-x-1 text-muted-foreground">
+                          <span>{player.actualPoints.toFixed(1)}</span>
+                          <span className="line-through">{player.projectedPoints.toFixed(1)}</span>
+                        </div>
+                        <span className={`font-semibold ${
+                          player.isBoom ? 'text-green-400' : 'text-red-400'
                         }`}>
-                          {matchup.matchupType === 'close' ? 'Close' :
-                           matchup.matchupType === 'blowout' ? 'Blowout' :
-                           matchup.matchupType === 'low_scoring' ? 'Low Score' :
-                           matchup.matchupType === 'high_scoring' ? 'High Score' : 'Competitive'}
+                          {player.percentageOver > 0 ? '+' : ''}{player.percentageOver.toFixed(0)}%
                         </span>
-                        <span className="text-muted-foreground">+{matchup.scoreDiff.toFixed(1)}</span>
                       </div>
                     </div>
                   ))}
@@ -450,7 +569,7 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '' }) => {
          (!highlights.data.upsets || highlights.data.upsets.length === 0) &&
          (!highlights.data.boomingPlayers || highlights.data.boomingPlayers.length === 0) &&
          (!highlights.data.bustingPlayers || highlights.data.bustingPlayers.length === 0) &&
-         (!highlights.data.fantasyMatchups || highlights.data.fantasyMatchups.length === 0) && (
+         (!highlights.data.impactfulBoomsBusts || highlights.data.impactfulBoomsBusts.length === 0) && (
           <div className="text-center py-8">
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-full flex items-center justify-center mb-4">
               <Trophy className="h-8 w-8 text-muted-foreground" />

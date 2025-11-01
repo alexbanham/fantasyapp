@@ -47,8 +47,8 @@ router.get('/', async (req, res) => {
       .select('eventId week season status period clock score homeTeam awayTeam isLive date venue')
       .lean();
 
-    // Debug logging for live games query
-    if (live_only === 'true') {
+    // Debug logging for live games query (development only)
+    if (live_only === 'true' && process.env.NODE_ENV === 'development') {
       console.log(`[DEBUG] Live games query returned ${games.length} games:`);
       games.forEach(game => {
         console.log(`  - ${game.awayTeam.abbreviation} @ ${game.homeTeam.abbreviation}: status="${game.status}", isLive=${game.isLive}, period=${game.period}, clock="${game.clock}"`);
@@ -89,11 +89,13 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching games:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error fetching games:', error);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to fetch games',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
     });
   }
 });
@@ -140,11 +142,13 @@ router.get('/live', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching live games:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error fetching live games:', error);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to fetch live games',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
     });
   }
 });
@@ -164,11 +168,13 @@ router.get('/status', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error getting polling status:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error getting polling status:', error);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to get polling status',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
     });
   }
 });
@@ -179,7 +185,9 @@ router.get('/:eventId/scorers', async (req, res) => {
   const { eventId } = req.params;
   const { limit = 10, homeTeam, awayTeam, week } = req.query;
   
-  console.log(`[SCORERS DEBUG] Request to fetch scorers for game ${eventId}`);
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[SCORERS DEBUG] Request to fetch scorers for game ${eventId}`);
+  }
   
   try {
     let homeTeamAbbr, awayTeamAbbr;
@@ -196,14 +204,20 @@ router.get('/:eventId/scorers', async (req, res) => {
       if (!gameWeek) {
         gameWeek = game.week;
       }
-      console.log(`[SCORERS DEBUG] Game found in database: ${awayTeamAbbr} @ ${homeTeamAbbr}, week: ${gameWeek}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[SCORERS DEBUG] Game found in database: ${awayTeamAbbr} @ ${homeTeamAbbr}, week: ${gameWeek}`);
+      }
     } else if (homeTeam && awayTeam) {
       // Fallback to query parameters
       homeTeamAbbr = homeTeam;
       awayTeamAbbr = awayTeam;
-      console.log(`[SCORERS DEBUG] Using team abbreviations from query params: ${awayTeamAbbr} @ ${homeTeamAbbr}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[SCORERS DEBUG] Using team abbreviations from query params: ${awayTeamAbbr} @ ${homeTeamAbbr}`);
+      }
     } else {
-      console.log(`[SCORERS DEBUG] Game not found in database and no team abbreviations provided`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[SCORERS DEBUG] Game not found in database and no team abbreviations provided`);
+      }
       return res.status(404).json({
         success: false,
         error: 'Game not found or team information not provided'
@@ -218,18 +232,24 @@ router.get('/:eventId/scorers', async (req, res) => {
     }
     
     // Fetch boxscore data from ESPN
-    console.log(`[SCORERS DEBUG] Calling espnService.fetchGameBoxscore for ${eventId}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[SCORERS DEBUG] Calling espnService.fetchGameBoxscore for ${eventId}`);
+    }
     const boxscoreData = await espnService.fetchGameBoxscore(eventId, homeTeamAbbr, awayTeamAbbr);
     
-    console.log(`[SCORERS DEBUG] fetchGameBoxscore returned:`, {
-      success: boxscoreData.success,
-      error: boxscoreData.error,
-      homePlayers: boxscoreData.homePlayers?.length || 0,
-      awayPlayers: boxscoreData.awayPlayers?.length || 0
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[SCORERS DEBUG] fetchGameBoxscore returned:`, {
+        success: boxscoreData.success,
+        error: boxscoreData.error,
+        homePlayers: boxscoreData.homePlayers?.length || 0,
+        awayPlayers: boxscoreData.awayPlayers?.length || 0
+      });
+    }
     
     if (!boxscoreData.success) {
-      console.log(`[SCORERS DEBUG] Boxscore fetch failed for ${eventId}: ${boxscoreData.error}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[SCORERS DEBUG] Boxscore fetch failed for ${eventId}: ${boxscoreData.error}`);
+      }
       return res.status(404).json({
         success: false,
         error: boxscoreData.error || 'Failed to fetch game boxscore'
@@ -248,7 +268,9 @@ router.get('/:eventId/scorers', async (req, res) => {
       ...boxscoreData.awayPlayers.map(p => p.espnId)
     ];
     
-    console.log(`[SCORERS DEBUG] Fetching ${playerIds.length} player data from database for week ${currentWeek}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[SCORERS DEBUG] Fetching ${playerIds.length} player data from database for week ${currentWeek}`);
+    }
     
     // Fetch player data including weekly actuals from database
     const playersFromDB = await ESPNPlayer.find({ 
@@ -281,23 +303,13 @@ router.get('/:eventId/scorers', async (req, res) => {
       });
     });
     
-    console.log(`[SCORERS DEBUG] Found ${playerDataMap.size} players in database`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[SCORERS DEBUG] Found ${playerDataMap.size} players in database`);
+    }
     
     // Add images, roster info, and fantasy points from database to the player data
-    let sampleLogged = false;
     const homePlayersWithImages = boxscoreData.homePlayers.map(p => {
       const dbData = playerDataMap.get(p.espnId) || {};
-      
-      // Log sample for debugging
-      if (!sampleLogged && dbData.roster_status === 'rostered') {
-        console.log(`[SCORERS DEBUG] Sample rostered player data:`, {
-          name: p.name,
-          fantasyPoints: dbData.fantasyPoints,
-          roster_status: dbData.roster_status,
-          fantasy_team_name: dbData.fantasy_team_name
-        });
-        sampleLogged = true;
-      }
       
       return {
         ...p,
@@ -312,8 +324,8 @@ router.get('/:eventId/scorers', async (req, res) => {
     const awayPlayersWithImages = boxscoreData.awayPlayers.map(p => {
       const dbData = playerDataMap.get(p.espnId) || {};
       
-      // Log for debugging if team name is missing
-      if (!dbData.fantasy_team_name && dbData.fantasy_team_id) {
+      // Log for debugging if team name is missing (development only)
+      if (process.env.NODE_ENV === 'development' && !dbData.fantasy_team_name && dbData.fantasy_team_id) {
         console.log(`[SCORERS DEBUG] Missing team name for player ${p.name}, team ID: ${dbData.fantasy_team_id}`);
       }
       
@@ -331,7 +343,9 @@ router.get('/:eventId/scorers', async (req, res) => {
     homePlayersWithImages.sort((a, b) => (b.fantasyPoints || 0) - (a.fantasyPoints || 0));
     awayPlayersWithImages.sort((a, b) => (b.fantasyPoints || 0) - (a.fantasyPoints || 0));
     
-    console.log(`[SCORERS DEBUG] Returning all ${homePlayersWithImages.length} home players and ${awayPlayersWithImages.length} away players`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[SCORERS DEBUG] Returning all ${homePlayersWithImages.length} home players and ${awayPlayersWithImages.length} away players`);
+    }
     
     res.json({
       success: true,
@@ -344,12 +358,14 @@ router.get('/:eventId/scorers', async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`[SCORERS DEBUG] Error fetching top scorers for ${eventId}:`, error);
-    console.error(`[SCORERS DEBUG] Error stack:`, error.stack);
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`[SCORERS DEBUG] Error fetching top scorers for ${eventId}:`, error);
+      console.error(`[SCORERS DEBUG] Error stack:`, error.stack);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to fetch top scorers',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred while fetching top scorers'
     });
   }
 });
@@ -363,10 +379,10 @@ router.get('/highlights', async (req, res) => {
     const currentWeek = week ? parseInt(week) : config.currentWeek || 1;
     const ESPNPlayer = require('../models/ESPNPlayer');
     
-    // Try to get recent finalized games from database (current week and previous week)
+    // Try to get recent finalized games from database (current week only)
     let recentGames = await Game.find({
       season: currentSeason,
-      week: { $in: [currentWeek, currentWeek - 1] },
+      week: currentWeek,
       status: 'STATUS_FINAL'
     })
       .sort({ date: -1 })
@@ -375,7 +391,9 @@ router.get('/highlights', async (req, res) => {
     
     // If no games in database, fetch from ESPN API in real-time
     if (!recentGames || recentGames.length === 0) {
-      console.log('[HIGHLIGHTS] No games in database, fetching from ESPN API for week', currentWeek);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[HIGHLIGHTS] No games in database, fetching from ESPN API for week', currentWeek);
+      }
       try {
         const espnGames = await espnService.fetchScoreboard(currentWeek, currentSeason);
         // Filter for completed games
@@ -391,16 +409,22 @@ router.get('/highlights', async (req, res) => {
             awayTeam: game.awayTeam,
             date: game.date
           }));
-        console.log('[HIGHLIGHTS] Fetched', recentGames.length, 'games from ESPN');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[HIGHLIGHTS] Fetched', recentGames.length, 'games from ESPN');
+        }
       } catch (err) {
-        console.error('[HIGHLIGHTS] Error fetching from ESPN:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[HIGHLIGHTS] Error fetching from ESPN:', err);
+        }
         recentGames = [];
       }
     }
     
     // Get all players to find top scorers and booms
     const allPlayers = await ESPNPlayer.find({}).lean();
-    console.log(`[HIGHLIGHTS] Checking ${allPlayers.length} players for top scorers`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[HIGHLIGHTS] Checking ${allPlayers.length} players for top scorers`);
+    }
     
     // Find top fantasy point earners from recent weeks
     const topScorers = [];
@@ -421,35 +445,32 @@ router.get('/highlights', async (req, res) => {
         }
       }
       
-      // Check both current week and previous week
-      for (const checkWeek of [currentWeek, currentWeek - 1]) {
-        const weekKey = checkWeek.toString();
-        const weekData = weeklyActuals[weekKey];
+      // Check current week only
+      const weekKey = currentWeek.toString();
+      const weekData = weeklyActuals[weekKey];
+      
+      if (weekData && typeof weekData === 'object') {
+        // Try to access ppr, and also check for other scoring types
+        const points = weekData.ppr || weekData.half || weekData.std;
         
-        if (weekData && typeof weekData === 'object') {
-          // Try to access ppr, and also check for other scoring types
-          const points = weekData.ppr || weekData.half || weekData.std;
-          
-          if (points && points > 0) {
-            playersWithData++;
-            topScorers.push({
-              espn_id: player.espn_id,
-              name: player.name,
-              position: player.position,
-              pro_team_id: player.pro_team_id,
-              headshot_url: player.headshot_url,
-              week: checkWeek,
-              points: points,
-              roster_status: player.roster_status || 'unknown',
-              fantasy_team_name: player.fantasy_team_name || null
-            });
-            break; // Only add once per player
-          }
+        if (points && points > 0) {
+          playersWithData++;
+          topScorers.push({
+            espn_id: player.espn_id,
+            name: player.name,
+            position: player.position,
+            pro_team_id: player.pro_team_id,
+            headshot_url: player.headshot_url,
+            week: currentWeek,
+            points: points,
+            roster_status: player.roster_status || 'unknown',
+            fantasy_team_name: player.fantasy_team_name || null
+          });
         }
       }
       
-      // Log sample of what we're seeing
-      if (playersChecked <= 3 && typeof weeklyActuals === 'object') {
+      // Log sample of what we're seeing (development only)
+      if (process.env.NODE_ENV === 'development' && playersChecked <= 3 && typeof weeklyActuals === 'object') {
         console.log(`[HIGHLIGHTS] Sample player ${player.name}:`, {
           hasWeeklyActuals: !!weeklyActuals,
           weekKeys: Object.keys(weeklyActuals || {}),
@@ -459,17 +480,27 @@ router.get('/highlights', async (req, res) => {
       }
     }
     
-    console.log(`[HIGHLIGHTS] Checked ${playersChecked} players, found ${playersWithData} with data, total entries: ${topScorers.length}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[HIGHLIGHTS] Checked ${playersChecked} players, found ${playersWithData} with data, total entries: ${topScorers.length}`);
+    }
     
     // Sort by points and get top 3
     topScorers.sort((a, b) => b.points - a.points);
-    const topThree = topScorers.slice(0, 3);
-    console.log(`[HIGHLIGHTS] Top 3 scorers:`, topThree.map(p => `${p.name}: ${p.points}`));
+    if (process.env.NODE_ENV === 'development') {
+      const topThree = topScorers.slice(0, 3);
+      console.log(`[HIGHLIGHTS] Top 3 scorers:`, topThree.map(p => `${p.name}: ${p.points}`));
+    }
     
     // Find games with upsets (large score differences) and their notable players
+    // Only include games from current week
     const upsetsWithPlayers = [];
     
     for (const game of recentGames) {
+      // Only process games from current week
+      if (game.week !== currentWeek) {
+        continue;
+      }
+      
       const scoreDiff = Math.abs(game.awayTeam.score - game.homeTeam.score);
       
       if (scoreDiff > 10) { // Games decided by more than 10 points
@@ -564,7 +595,8 @@ router.get('/highlights', async (req, res) => {
           const diff = actualPoints - projPoints;
           const percentage = (diff / projPoints) * 100;
           
-          if (diff > 10 && percentage > 30) { // At least 10 points more and 30% over projection
+          // Booms: at least 10 points more AND 30% over projection, OR at least 5 points more AND 20% over (for less impactful but still notable)
+          if ((diff > 10 && percentage > 30) || (diff > 5 && percentage > 20)) {
             boomingPlayers.push({
               espn_id: player.espn_id,
               name: player.name,
@@ -584,12 +616,16 @@ router.get('/highlights', async (req, res) => {
       }
     }
     
-    console.log(`[HIGHLIGHTS] Checked ${boomingChecked} players for booms, found ${boomingPlayers.length} booming players`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[HIGHLIGHTS] Checked ${boomingChecked} players for booms, found ${boomingPlayers.length} booming players`);
+    }
     
     // Sort by over-projection percentage and get top 2
     boomingPlayers.sort((a, b) => b.percentageOver - a.percentageOver);
-    const topBooms = boomingPlayers.slice(0, 2);
-    console.log(`[HIGHLIGHTS] Top booms:`, topBooms.map(p => `${p.name}: +${p.percentageOver.toFixed(1)}%`));
+    if (process.env.NODE_ENV === 'development') {
+      const topBooms = boomingPlayers.slice(0, 2);
+      console.log(`[HIGHLIGHTS] Top booms:`, topBooms.map(p => `${p.name}: +${p.percentageOver.toFixed(1)}%`));
+    }
     
     // Find players who underperformed their projections significantly (busts)
     const bustingPlayers = [];
@@ -623,7 +659,8 @@ router.get('/highlights', async (req, res) => {
           const percentage = (diff / projPoints) * 100;
           
           // Player busted if they scored significantly less than projected
-          if (diff < -10 && percentage < -30) {
+          // Busts: at least 10 points less AND 30% under, OR at least 5 points less AND 20% under
+          if ((diff < -10 && percentage < -30) || (diff < -5 && percentage < -20)) {
             bustingPlayers.push({
               espn_id: player.espn_id,
               name: player.name,
@@ -645,16 +682,18 @@ router.get('/highlights', async (req, res) => {
     
     // Sort by under-projection percentage and get top 2
     bustingPlayers.sort((a, b) => b.percentageUnder - a.percentageUnder);
-    const topBusts = bustingPlayers.slice(0, 2);
-    console.log(`[HIGHLIGHTS] Top busts:`, topBusts.map(p => `${p.name}: -${p.percentageUnder.toFixed(1)}%`));
+    if (process.env.NODE_ENV === 'development') {
+      const topBusts = bustingPlayers.slice(0, 2);
+      console.log(`[HIGHLIGHTS] Top busts:`, topBusts.map(p => `${p.name}: -${p.percentageUnder.toFixed(1)}%`));
+    }
     
-    // Find interesting fantasy matchups for current week
+    // Find impactful booms and busts that significantly affect matchup outcomes
     const Matchup = require('../models/Matchup');
     const WeeklyTeamTotals = require('../models/WeeklyTeamTotals');
-    const FantasyTeam = require('../models/FantasyTeam');
+    const WeeklyPlayerLine = require('../models/WeeklyPlayerLine');
     const leagueId = parseInt(process.env.ESPN_LEAGUE_ID);
     
-    let interestingMatchups = [];
+    const impactfulBoomsBusts = [];
     
     if (leagueId) {
       try {
@@ -676,8 +715,6 @@ router.get('/highlights', async (req, res) => {
           });
         }
         
-        console.log(`[HIGHLIGHTS] Mapped ${teamNamesMap.size} team names`);
-        
         // Get matchups for current week
         const matchups = await Matchup.find({
           league_id: leagueId,
@@ -685,83 +722,347 @@ router.get('/highlights', async (req, res) => {
           week: currentWeek
         }).lean();
         
-        // Get team totals map
+        // Build matchup map (team_id -> matchup info)
+        const matchupMap = new Map();
         const totalsMap = new Map();
         teamTotals.forEach(tt => {
           totalsMap.set(tt.team_id, tt);
         });
         
-        // Find interesting matchups
-        for (const matchup of matchups) {
-          const awayTotals = totalsMap.get(matchup.away_team_id);
-          const homeTotals = totalsMap.get(matchup.home_team_id);
+        matchups.forEach(matchup => {
+          matchupMap.set(matchup.away_team_id, matchup);
+          matchupMap.set(matchup.home_team_id, matchup);
+        });
+        
+        // Helper function to calculate win probability based on score difference
+        // Using logistic function: P(win) = 1 / (1 + exp(-k * diff))
+        // k = 0.1 gives reasonable probability curve
+        const calculateWinProbability = (teamScore, opponentScore) => {
+          const diff = teamScore - opponentScore;
+          const k = 0.1; // Sensitivity factor
+          return 1 / (1 + Math.exp(-k * diff));
+        };
+        
+        // Get all player ESPN IDs to check their game status
+        const allPlayerIds = new Set();
+        boomingPlayers.forEach(p => allPlayerIds.add(parseInt(p.espn_id)));
+        bustingPlayers.forEach(p => allPlayerIds.add(parseInt(p.espn_id)));
+        
+        // Get player info (pro_team_id) from ESPNPlayer collection
+        const ESPNPlayer = require('../models/ESPNPlayer');
+        const players = await ESPNPlayer.find({
+          espn_id: { $in: Array.from(allPlayerIds) }
+        }).select('espn_id pro_team_id').lean();
+        
+        const playerTeamMap = new Map();
+        players.forEach(p => {
+          playerTeamMap.set(p.espn_id, p.pro_team_id);
+        });
+        
+        // Get all games for this week to check player game status
+        const games = await Game.find({
+          season: currentSeason,
+          week: currentWeek
+        }).lean();
+        
+        // Create a map of team abbreviation to game status
+        const teamGameStatusMap = new Map();
+        games.forEach(game => {
+          if (game.homeTeam?.abbreviation && game.status) {
+            teamGameStatusMap.set(game.homeTeam.abbreviation, {
+              status: game.status,
+              isLive: game.isLive || false
+            });
+          }
+          if (game.awayTeam?.abbreviation && game.status) {
+            teamGameStatusMap.set(game.awayTeam.abbreviation, {
+              status: game.status,
+              isLive: game.isLive || false
+            });
+          }
+        });
+        
+        // Helper function to check player game status
+        const getPlayerGameStatus = (playerId) => {
+          const proTeamId = playerTeamMap.get(parseInt(playerId));
+          if (!proTeamId) return null;
           
-          if (awayTotals && homeTotals) {
-            const awayScore = awayTotals.total_actual || 0;
-            const homeScore = homeTotals.total_actual || 0;
-            const scoreDiff = Math.abs(awayScore - homeScore);
-            const maxScore = Math.max(awayScore, homeScore);
-            const minScore = Math.min(awayScore, homeScore);
-            const avgScore = (awayScore + homeScore) / 2;
+          const gameStatus = teamGameStatusMap.get(proTeamId);
+          if (!gameStatus) return null;
+          
+          return {
+            status: gameStatus.status,
+            isFinal: gameStatus.status === 'STATUS_FINAL',
+            isLive: gameStatus.status === 'STATUS_IN' || gameStatus.status === 'STATUS_HALFTIME',
+            isCompleted: gameStatus.status === 'STATUS_FINAL'
+          };
+        };
+        
+        // Function to find impactful players with progressive relaxation of criteria
+        const findImpactfulPlayers = async (
+          impactThreshold,
+          allowInProgress = false,
+          boomBustCriteria = null
+        ) => {
+          const results = [];
+          
+          // Mark booms and busts for easier identification
+          let boomsWithType = boomingPlayers.map(p => ({ ...p, isBoom: true }));
+          let bustsWithType = bustingPlayers.map(p => ({ ...p, isBoom: false }));
+          
+          // Apply relaxed boom/bust criteria if provided
+          if (boomBustCriteria) {
+            const { boomDiff, boomPercent, bustDiff, bustPercent } = boomBustCriteria;
+            boomsWithType = boomingPlayers.filter(p => {
+              const diff = p.actualPoints - p.projectedPoints;
+              const percent = (diff / p.projectedPoints) * 100;
+              return diff > boomDiff && percent > boomPercent;
+            }).map(p => ({ ...p, isBoom: true }));
             
-            let matchupType = null;
+            bustsWithType = bustingPlayers.filter(p => {
+              const diff = p.actualPoints - p.projectedPoints;
+              const percent = (diff / p.projectedPoints) * 100;
+              return diff < bustDiff && percent < bustPercent;
+            }).map(p => ({ ...p, isBoom: false }));
+          }
+          
+          const allImpactfulPlayers = [...boomsWithType, ...bustsWithType];
+          
+          for (const player of allImpactfulPlayers) {
+            // Check game status
+            const gameStatus = getPlayerGameStatus(player.espn_id);
+            if (!gameStatus) continue;
             
-            // Very close game (within 5 points)
-            if (scoreDiff < 5) {
-              matchupType = 'close';
-            }
-            // Blowout (difference of 30+)
-            else if (scoreDiff > 30) {
-              matchupType = 'blowout';
-            }
-            // Low scoring (both teams under 80)
-            else if (maxScore < 80) {
-              matchupType = 'low_scoring';
-            }
-            // High scoring (both teams over 120)
-            else if (minScore > 120) {
-              matchupType = 'high_scoring';
-            }
-            // Moderate differential (between 5 and 30 points)
-            else {
-              matchupType = 'competitive';
-            }
+            // Filter by game status based on allowInProgress
+            if (!allowInProgress && !gameStatus.isCompleted) continue;
+            if (allowInProgress && !gameStatus.isCompleted && !gameStatus.isLive) continue;
+          
+          // Find player's fantasy team ID from WeeklyPlayerLine
+          // This ensures the player is actually rostered this week AND is a starter
+          const playerLine = await WeeklyPlayerLine.findOne({
+            league_id: leagueId,
+            season: currentSeason,
+            week: currentWeek,
+            player_id: parseInt(player.espn_id)
+          }).lean();
+          
+          if (!playerLine) continue;
+          
+          // Only include starters, not bench players
+          // Check both is_starter flag and lineup_slot_id (BENCH=20, IR=21)
+          const SLOT = require('../utils/slots').SLOT;
+          if (!playerLine.is_starter || playerLine.lineup_slot_id === SLOT.BENCH || playerLine.lineup_slot_id === SLOT.IR) {
+            continue;
+          }
+          
+          const playerTeamId = playerLine.team_id;
+          const matchup = matchupMap.get(playerTeamId);
+          
+          if (!matchup) continue;
+          
+          // Get opponent team ID
+          const opponentTeamId = matchup.away_team_id === playerTeamId 
+            ? matchup.home_team_id 
+            : matchup.away_team_id;
+          
+          // Get full rosters for both teams to calculate expected scores properly
+          // This must match the MatchupModal calculation exactly
+          const [playerTeamRoster, opponentTeamRoster] = await Promise.all([
+            WeeklyPlayerLine.find({
+              league_id: leagueId,
+              season: currentSeason,
+              week: currentWeek,
+              team_id: playerTeamId
+            }).lean(),
+            WeeklyPlayerLine.find({
+              league_id: leagueId,
+              season: currentSeason,
+              week: currentWeek,
+              team_id: opponentTeamId
+            }).lean()
+          ]);
+          
+          // Helper function to get player's pro team ID (for game status lookup)
+          const getPlayerProTeamId = (playerId) => {
+            return playerTeamMap.get(parseInt(playerId));
+          };
+          
+          // Helper function to calculate expected total for a team (matches MatchupModal logic exactly)
+          // Sum starter points: actual for played/playing, projected for not played
+          const calculateExpectedTotal = (roster, excludePlayerId = null) => {
+            // Filter to only starters (is_starter = true, and not BENCH/IR)
+            const SLOT = require('../utils/slots').SLOT;
+            const starters = roster.filter(p => {
+              if (excludePlayerId && p.player_id === excludePlayerId) return false;
+              if (!p.is_starter) return false;
+              const slotId = p.lineup_slot_id;
+              return slotId !== SLOT.BENCH && slotId !== SLOT.IR;
+            });
             
-            // Always include the matchup, even if no special type
-            if (true) {
-              interestingMatchups.push({
-                matchupId: matchup.matchup_id,
-                awayTeam: {
-                  teamId: matchup.away_team_id,
-                  teamName: teamNamesMap.get(matchup.away_team_id) || `Team ${matchup.away_team_id}`,
-                  score: awayScore
-                },
-                homeTeam: {
-                  teamId: matchup.home_team_id,
-                  teamName: teamNamesMap.get(matchup.home_team_id) || `Team ${matchup.home_team_id}`,
-                  score: homeScore
-                },
-                scoreDiff,
-                matchupType,
-                week: currentWeek
-              });
-            }
+            let expectedTotal = 0;
+            starters.forEach(p => {
+              // Get player game status
+              const proTeamId = getPlayerProTeamId(p.player_id);
+              if (!proTeamId) {
+                // No game status info, use projected
+                expectedTotal += p.points_projected || 0;
+                return;
+              }
+              
+              const gameStatus = getPlayerGameStatus(p.player_id);
+              if (!gameStatus) {
+                // No game status, use projected
+                expectedTotal += p.points_projected || 0;
+                return;
+              }
+              
+              // Match MatchupModal logic exactly: actual for played/playing, projected for not played
+              const hasPlayed = gameStatus.status === 'STATUS_FINAL';
+              const isPlaying = gameStatus.status === 'STATUS_IN' || gameStatus.status === 'STATUS_HALFTIME';
+              
+              if (hasPlayed || isPlaying) {
+                // Player has played or is playing - use actual points
+                expectedTotal += p.points_actual || 0;
+              } else {
+                // Player hasn't played yet - use projected points
+                expectedTotal += p.points_projected || 0;
+              }
+            });
+            
+            return expectedTotal;
+          };
+          
+          // Calculate expected totals WITH player's impact (current state)
+          const teamExpected = calculateExpectedTotal(playerTeamRoster);
+          
+          // Calculate expected totals WITHOUT player's impact (if they had scored projected)
+          const teamExpectedWithoutPlayer = calculateExpectedTotal(playerTeamRoster, parseInt(player.espn_id));
+          // Add back the player's projected points
+          const adjustedTeamExpected = teamExpectedWithoutPlayer + player.projectedPoints;
+          
+          // Calculate opponent's expected total
+          const opponentExpected = calculateExpectedTotal(opponentTeamRoster);
+          
+          // Calculate player's impact (actual - projected points)
+          const playerImpact = player.actualPoints - player.projectedPoints;
+          
+          // Get team projected total for percentage calculation
+          const playerTeamTotals = totalsMap.get(playerTeamId);
+          const playerTeamProjected = playerTeamTotals?.total_projected || 0;
+          
+          // Calculate win probability using expected scores (same algorithm as matchup display)
+          const calculateWinProb = (teamScore, oppScore) => {
+            const diff = teamScore - oppScore;
+            const k = 0.02; // Same sensitivity factor as matchup win prob
+            return 1 / (1 + Math.exp(-k * diff));
+          };
+          
+          const projectedWinProbWithoutPlayer = calculateWinProb(adjustedTeamExpected, opponentExpected);
+          const actualWinProb = calculateWinProb(teamExpected, opponentExpected);
+          
+          // Calculate impact on win probability
+          const winProbImpact = actualWinProb - projectedWinProbWithoutPlayer;
+          const winProbImpactPercent = winProbImpact * 100;
+          
+          // Calculate impact as percentage of team's projected total (similar to win prob calculation)
+          // This shows how much the player's boom/bust affected their team's projected score
+          const projectedTotalImpact = (playerImpact / playerTeamProjected) * 100;
+          
+          // Only include if impact meets threshold
+          if (Math.abs(winProbImpactPercent) > impactThreshold) {
+            const opponentTeamName = teamNamesMap.get(opponentTeamId) || `Team ${opponentTeamId}`;
+            const playerTeamName = teamNamesMap.get(playerTeamId) || `Team ${playerTeamId}`;
+            
+            // Calculate projection percentage (positive for booms, negative for busts)
+            const projectionDiff = player.actualPoints - player.projectedPoints;
+            const projectionPercent = (projectionDiff / player.projectedPoints) * 100;
+            
+            results.push({
+              espn_id: player.espn_id,
+              name: player.name,
+              position: player.position,
+              pro_team_id: player.pro_team_id,
+              headshot_url: player.headshot_url,
+              week: currentWeek,
+              actualPoints: player.actualPoints,
+              projectedPoints: player.projectedPoints,
+              overProjection: player.isBoom ? player.overProjection : -player.underProjection,
+              percentageOver: player.isBoom ? player.percentageOver : projectionPercent,
+              roster_status: player.roster_status || 'unknown',
+              fantasy_team_name: playerTeamName,
+              fantasy_team_id: playerTeamId,
+              opponent_team_name: opponentTeamName,
+              opponent_team_id: opponentTeamId,
+              winProbImpact: winProbImpactPercent,
+              projectedTotalImpact: projectedTotalImpact, // Impact on team's projected total as percentage
+              playerImpactPoints: playerImpact, // Raw point impact
+              isBoom: player.isBoom,
+              projectedWinProb: projectedWinProbWithoutPlayer * 100,
+              actualWinProb: actualWinProb * 100,
+              gameStatus: gameStatus.status
+            });
           }
         }
         
-        // Sort by interest (close games first, then by other factors)
-        interestingMatchups.sort((a, b) => {
-          if (a.matchupType === 'close' && b.matchupType !== 'close') return -1;
-          if (b.matchupType === 'close' && a.matchupType !== 'close') return 1;
-          return a.scoreDiff - b.scoreDiff;
-        });
+        return results;
+      };
+      
+      // Try progressively relaxed criteria until we find some results
+      // Reordered to prioritize in-progress games earlier since most players are in-progress
+      const criteriaTiers = [
+        { impactThreshold: 5, allowInProgress: false, boomBustCriteria: null, name: 'Strict (completed, >5% impact)' },
+        { impactThreshold: 3, allowInProgress: false, boomBustCriteria: null, name: 'Relaxed impact (completed, >3% impact)' },
+        { impactThreshold: 5, allowInProgress: true, boomBustCriteria: null, name: 'Include in-progress (>5% impact)' },
+        { impactThreshold: 3, allowInProgress: true, boomBustCriteria: null, name: 'Include in-progress (>3% impact)' },
+        { impactThreshold: 1, allowInProgress: false, boomBustCriteria: null, name: 'More relaxed (completed, >1% impact)' },
+        { impactThreshold: 1, allowInProgress: true, boomBustCriteria: null, name: 'Include in-progress (>1% impact)' },
+        { impactThreshold: 0.5, allowInProgress: true, boomBustCriteria: null, name: 'Minimal impact with in-progress (>0.5% impact)' },
+        { impactThreshold: 5, allowInProgress: false, boomBustCriteria: { boomDiff: 7, boomPercent: 20, bustDiff: -7, bustPercent: -20 }, name: 'Relaxed boom/bust (completed, >5% impact)' },
+        { impactThreshold: 3, allowInProgress: false, boomBustCriteria: { boomDiff: 7, boomPercent: 20, bustDiff: -7, bustPercent: -20 }, name: 'Relaxed boom/bust (completed, >3% impact)' },
+        { impactThreshold: 5, allowInProgress: true, boomBustCriteria: { boomDiff: 5, boomPercent: 20, bustDiff: -5, bustPercent: -20 }, name: 'Relaxed boom/bust with in-progress (>5% impact)' },
+        { impactThreshold: 3, allowInProgress: true, boomBustCriteria: { boomDiff: 5, boomPercent: 20, bustDiff: -5, bustPercent: -20 }, name: 'Relaxed boom/bust with in-progress (>3% impact)' },
+        { impactThreshold: 1, allowInProgress: false, boomBustCriteria: { boomDiff: 5, boomPercent: 15, bustDiff: -5, bustPercent: -15 }, name: 'Very relaxed (completed, >1% impact)' },
+        { impactThreshold: 1, allowInProgress: true, boomBustCriteria: { boomDiff: 3, boomPercent: 15, bustDiff: -3, bustPercent: -15 }, name: 'Very relaxed with in-progress (>1% impact)' },
+        { impactThreshold: 0.5, allowInProgress: false, boomBustCriteria: { boomDiff: 5, boomPercent: 15, bustDiff: -5, bustPercent: -15 }, name: 'Minimal (completed, >0.5% impact)' },
+        { impactThreshold: 0.5, allowInProgress: true, boomBustCriteria: { boomDiff: 3, boomPercent: 10, bustDiff: -3, bustPercent: -10 }, name: 'Minimal with in-progress (>0.5% impact)' }
+      ];
+      
+      let finalResults = [];
+      let usedTier = null;
+      
+      for (const tier of criteriaTiers) {
+        finalResults = await findImpactfulPlayers(
+          tier.impactThreshold,
+          tier.allowInProgress,
+          tier.boomBustCriteria
+        );
         
-        // Take top 4 matchups
-        interestingMatchups = interestingMatchups.slice(0, 4);
+        if (finalResults.length > 0) {
+          usedTier = tier;
+          console.log(`[HIGHLIGHTS] Found ${finalResults.length} impactful booms/busts using tier: ${tier.name}`);
+          break;
+        }
+      }
+      
+      if (finalResults.length === 0) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[HIGHLIGHTS] No impactful booms/busts found with any criteria tier`);
+        }
+      } else {
+        // Sort by absolute impact (most impactful first)
+        finalResults.sort((a, b) => Math.abs(b.winProbImpact) - Math.abs(a.winProbImpact));
         
-        console.log(`[HIGHLIGHTS] Found ${interestingMatchups.length} interesting matchups`);
+        // Take top 4 most impactful
+        impactfulBoomsBusts.push(...finalResults.slice(0, 4));
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[HIGHLIGHTS] Using ${usedTier.name} tier, showing ${impactfulBoomsBusts.length} players`);
+        }
+      }
       } catch (err) {
-        console.error('[HIGHLIGHTS] Error fetching fantasy matchups:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[HIGHLIGHTS] Error calculating impactful booms/busts:', err);
+        }
       }
     }
     
@@ -774,16 +1075,18 @@ router.get('/highlights', async (req, res) => {
         upsets: upsets,
         boomingPlayers: topBooms,
         bustingPlayers: topBusts,
-        fantasyMatchups: interestingMatchups
+        impactfulBoomsBusts: impactfulBoomsBusts.slice(0, 4)
       }
     });
     
   } catch (error) {
-    console.error('Error fetching highlights:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error fetching highlights:', error);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to fetch highlights',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
     });
   }
 });
@@ -832,11 +1135,13 @@ router.get('/:eventId', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching game details:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error fetching game details:', error);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to fetch game details',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
     });
   }
 });
@@ -931,11 +1236,13 @@ router.get('/week/:week', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching games by week:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error fetching games by week:', error);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to fetch games by week',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
     });
   }
 });
@@ -962,11 +1269,13 @@ router.post('/start', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error starting polling service:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error starting polling service:', error);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to start polling service',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
     });
   }
 });
@@ -983,11 +1292,13 @@ router.post('/stop', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error stopping polling service:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error stopping polling service:', error);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to stop polling service',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
     });
   }
 });
@@ -1004,11 +1315,13 @@ router.post('/restart', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error restarting polling service:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error restarting polling service:', error);
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to restart polling service',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
     });
   }
 });
@@ -1025,11 +1338,13 @@ router.post('/poll', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error in manual poll:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error in manual poll:', error);
+    }
     res.status(500).json({
       success: false,
       error: 'Manual poll failed',
-      message: error.message
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
     });
   }
 });

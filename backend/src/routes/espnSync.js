@@ -151,7 +151,139 @@ router.post('/weekly/projections', async (req, res) => {
     });
   }
 });
-// POST /api/sync/weekly/players - For PlayerSync page
+// POST /api/sync/weekly/rostered-players - Sync only rostered players for current week (optimized for matchups)
+router.post('/weekly/rostered-players', async (req, res) => {
+  const syncId = generateSyncId('weekly_rostered_players');
+  const { updateDatabase = true } = req.body;
+  try {
+    const config = await require('../models/Config').getConfig();
+    const season = config.currentSeason || 2025;
+    const weekNum = config.currentWeek || 1;
+    
+    // Use getRosteredPlayersWithStats instead of getComprehensiveWeekData
+    // This only syncs rostered players, not all players
+    const result = await espnService.getRosteredPlayersWithStats(season, weekNum);
+    
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.error,
+        syncId
+      });
+    }
+    
+    let databaseStats = { playersCreated: 0, playersUpdated: 0, errors: 0 };
+    
+    if (updateDatabase && result.rosteredPlayers && result.rosteredPlayers.length > 0) {
+      const bulkOps = result.rosteredPlayers.map(playerStat => ({
+        updateOne: {
+          filter: { espn_id: playerStat.espnId },
+          update: {
+            $set: {
+              name: playerStat.name,
+              first_name: playerStat.firstName,
+              last_name: playerStat.lastName,
+              position: playerStat.position,
+              pro_team_id: playerStat.proTeamId,
+              jersey_number: playerStat.jerseyNumber,
+              roster_status: playerStat.rosterStatus || 'unknown',
+              fantasy_team_id: playerStat.fantasyTeamId || null,
+              fantasy_team_name: playerStat.fantasyTeamName || null,
+              last_updated: new Date()
+            },
+            $setOnInsert: {
+              espn_id: playerStat.espnId,
+              created_at: new Date()
+            }
+          },
+          upsert: true
+        }
+      }));
+      
+      try {
+        const bulkResult = await ESPNPlayer.bulkWrite(bulkOps);
+        databaseStats.playersCreated = bulkResult.upsertedCount;
+        databaseStats.playersUpdated = bulkResult.modifiedCount;
+      } catch (error) {
+        databaseStats.errors = bulkOps.length;
+        console.error('[SYNC] Error in bulk write for rostered players:', error);
+      }
+      
+      // Update weekly stats (actuals and projections) for rostered players
+      for (const playerStat of result.rosteredPlayers) {
+        try {
+          const player = await ESPNPlayer.findOne({ espn_id: playerStat.espnId });
+          if (player) {
+            let weeklyActuals = player.weekly_actuals || {};
+            let weeklyProjections = player.weekly_projections || {};
+            
+            // Convert Maps to Objects if needed
+            if (weeklyActuals && typeof weeklyActuals === 'object' && !Array.isArray(weeklyActuals)) {
+              if (typeof weeklyActuals.get === 'function') {
+                weeklyActuals = Object.fromEntries(weeklyActuals);
+              }
+            }
+            if (weeklyProjections && typeof weeklyProjections === 'object' && !Array.isArray(weeklyProjections)) {
+              if (typeof weeklyProjections.get === 'function') {
+                weeklyProjections = Object.fromEntries(weeklyProjections);
+              }
+            }
+            
+            // Update weekly actuals and projections for this week
+            // getRosteredPlayersWithStats returns totalPoints and projectedPoints
+            if (playerStat.totalPoints !== null && playerStat.totalPoints !== undefined) {
+              weeklyActuals[weekNum.toString()] = {
+                ppr: playerStat.totalPoints,
+                half: playerStat.totalPoints * 0.5,
+                std: playerStat.totalPoints * 0.5
+              };
+            }
+            if (playerStat.projectedPoints !== null && playerStat.projectedPoints !== undefined) {
+              weeklyProjections[weekNum.toString()] = {
+                ppr: playerStat.projectedPoints,
+                half: playerStat.projectedPoints * 0.5,
+                std: playerStat.projectedPoints * 0.5
+              };
+            }
+            
+            await ESPNPlayer.updateOne(
+              { espn_id: playerStat.espnId },
+              {
+                $set: {
+                  weekly_actuals: weeklyActuals,
+                  weekly_projections: weeklyProjections,
+                  last_updated: new Date()
+                }
+              }
+            );
+          }
+        } catch (error) {
+          databaseStats.errors++;
+          console.error(`[SYNC] Error updating weekly stats for player ${playerStat.espnId}:`, error);
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        syncId,
+        seasonId: season,
+        week: weekNum,
+        playersFetched: result.rosteredPlayers?.length || 0,
+        databaseStats
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      syncId
+    });
+  }
+});
+
+// POST /api/sync/weekly/players - For PlayerSync page (syncs all players)
 router.post('/weekly/players', async (req, res) => {
   const syncId = generateSyncId('weekly_players');
   const { updateDatabase = true } = req.body;
@@ -595,10 +727,6 @@ router.post('/all', async (req, res) => {
                 const bulkResult = await ESPNPlayer.bulkWrite(bulkOps);
                 totalStats.playersCreated += bulkResult.upsertedCount;
                 totalStats.playersUpdated += bulkResult.modifiedCount;
-                // Debug: Log bulk write results for first week
-                if (week === startWeek) {
-                  // Debug log could go here
-                }
               } catch (error) {
                 totalStats.errors += bulkOps.length;
               }

@@ -9,12 +9,13 @@ import {
   SelectTrigger,
   SelectValue
 } from '../components/ui/select'
-import { RefreshCw, Trophy, Users, Calendar, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, ArrowLeftRight } from 'lucide-react'
+import { RefreshCw, Trophy, Users, Calendar, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, ArrowLeftRight, CheckCircle2, Clock, Play } from 'lucide-react'
 import { 
   getLeagueOverview, 
   getAvailableWeeks,
   getLeagueBoxscores,
   syncWeek,
+  syncRosteredPlayersCurrentWeek,
   getLeagueTransactions,
   syncLeagueTransactions,
   LeagueStanding,
@@ -25,6 +26,7 @@ import {
   TransactionStats
 } from '../services/api'
 import Transactions from '../components/Transactions'
+import { getTeamLogoWithFallback } from '../lib/teamLogos'
 
 interface LeagueData {
   standings: LeagueStanding[]
@@ -69,6 +71,7 @@ const League: React.FC = () => {
 
   // Handle jumping to a team's detailed roster
   const handleJumpToTeam = (teamId: number) => {
+    setActiveTab('rosters')
     setShowDetailedMatchups(true)
     setScrollToTeam(teamId)
     // Scroll will happen after the detailed rosters are rendered
@@ -224,11 +227,23 @@ const League: React.FC = () => {
     initializeData()
   }, [])
 
-  // Fetch data when selectedWeek changes
+  // Fetch data when selectedWeek or currentWeek changes
   useEffect(() => {
     if (selectedWeek !== null) {
       const loadData = async () => {
         setLoading(true)
+        
+        // Sync rostered players for current week if we're loading current week matchups
+        // Only sync rostered players (not all players) for efficiency
+        // Do this once before fetching data to avoid duplicate syncs
+        if (selectedWeek && currentWeek && selectedWeek === currentWeek) {
+          try {
+            await syncRosteredPlayersCurrentWeek()
+          } catch (syncError) {
+            console.warn('Error syncing rostered players (continuing anyway):', syncError)
+            // Continue even if sync fails
+          }
+        }
         
         // Always fetch the data first
         await Promise.all([
@@ -260,7 +275,7 @@ const League: React.FC = () => {
       }
       loadData()
     }
-  }, [selectedWeek])
+  }, [selectedWeek, currentWeek])
 
   // Fetch transactions when tab changes
   useEffect(() => {
@@ -275,7 +290,7 @@ const League: React.FC = () => {
 
   // Handle scrolling to a team's detailed roster
   useEffect(() => {
-    if (scrollToTeam && showDetailedMatchups && boxscoreData) {
+    if (scrollToTeam && showDetailedMatchups && boxscoreData && activeTab === 'rosters') {
       // Find the matchup that contains this team
       const matchup = boxscoreData.matchups.find(m => 
         m.homeTeam.teamId === scrollToTeam || m.awayTeam.teamId === scrollToTeam
@@ -286,27 +301,34 @@ const League: React.FC = () => {
         const matchupIdx = boxscoreData.matchups.indexOf(matchup)
         const elementId = `matchup-${matchupIdx}-${scrollToTeam}`
         
-        // Scroll after a short delay to ensure the element is rendered
+        // Scroll after a delay to ensure the element is rendered and tab is switched
         setTimeout(() => {
           const element = document.getElementById(elementId)
           if (element) {
-            // Scroll with offset to center the element in view
-            const elementPosition = element.getBoundingClientRect().top
-            const offsetPosition = elementPosition + window.pageYOffset - (window.innerHeight / 2) + 100
-            window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
+            // Get element position relative to viewport
+            const elementRect = element.getBoundingClientRect()
+            const absoluteElementTop = elementRect.top + window.pageYOffset
+            // Calculate offset to center element in viewport
+            const offsetPosition = absoluteElementTop - (window.innerHeight / 2) + (elementRect.height / 2)
             
-            // Highlight the team briefly
-            element.classList.add('ring-2', 'ring-blue-500')
+            // Scroll to center the element
+            window.scrollTo({ 
+              top: Math.max(0, offsetPosition), 
+              behavior: 'smooth' 
+            })
+            
+            // Highlight the team briefly with a ring
+            element.classList.add('ring-4', 'ring-blue-500', 'ring-offset-2')
             setTimeout(() => {
-              element.classList.remove('ring-2', 'ring-blue-500')
-            }, 2000)
+              element.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-2')
+            }, 3000)
           }
-        }, 100)
+        }, 300) // Increased delay to ensure tab switch is complete
       }
       
       setScrollToTeam(null)
     }
-  }, [scrollToTeam, showDetailedMatchups, boxscoreData])
+  }, [scrollToTeam, showDetailedMatchups, boxscoreData, activeTab])
 
   const getStreakIcon = (streak: string) => {
     if (streak.includes('W')) return <TrendingUp className="h-4 w-4 text-green-500" />
@@ -627,283 +649,773 @@ const League: React.FC = () => {
         ) : activeTab !== 'transactions' && (
           <>
           {activeTab === 'standings' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Standings */}
-          <div>
-            <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center">
-              <Trophy className="h-6 w-6 mr-2 text-primary" />
-              Standings
-            </h2>
-            <Card className="p-6">
-              <div className="space-y-4">
-                {leagueData.standings.map((team, index) => (
-                  <div key={team.teamId} className="flex items-center justify-between p-4 rounded-lg border">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
-                        {index + 1}
-                      </div>
-                      {team.logo ? (
-                        <img src={team.logo} alt={team.teamName} className="w-10 h-10 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                          <Users className="w-5 h-5 text-gray-500" />
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="font-semibold text-foreground">{team.teamName}</h3>
-                        <p className="text-sm text-muted-foreground">{team.owner}</p>
-                      </div>
-                    </div>
-                      <div className="text-right">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="font-semibold">{team.wins}-{team.losses}</span>
-                          {team.ties > 0 && <span className="text-muted-foreground">-{team.ties}</span>}
-                          <Badge variant="secondary" className="text-xs">
-                            {Math.round(team.winPercentage * 1000) / 10}%
-                          </Badge>
-                        </div>
-                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                          <span>PF: {team.pointsFor?.toFixed(1) ?? '0.0'}</span>
-                          <span>PA: {team.pointsAgainst?.toFixed(1) ?? '0.0'}</span>
-                        <div className="flex items-center space-x-1">
-                          {getStreakIcon(team.streak)}
-                          <span>{team.streak}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            <div>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-foreground mb-2 flex items-center">
+                  <Trophy className="h-6 w-6 mr-2 text-primary" />
+                  League Standings
+                </h2>
+                <p className="text-sm text-muted-foreground">Click on any team to view their roster</p>
               </div>
-            </Card>
-          </div>
+              <Card>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-border/30">
+                    {leagueData.standings.map((team, index) => (
+                      <div 
+                        key={team.teamId}
+                        className="grid grid-cols-12 gap-4 items-center p-4 hover:bg-accent/50 transition-colors cursor-pointer group"
+                        onClick={() => handleJumpToTeam(team.teamId)}
+                      >
+                        {/* Rank Badge - Fixed width column */}
+                        <div className="col-span-1 flex justify-center">
+                          <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-base ${
+                            index === 0 ? 'bg-gradient-to-br from-yellow-500/30 to-yellow-600/30 text-yellow-600' :
+                            index === 1 ? 'bg-gradient-to-br from-slate-400/30 to-slate-500/30 text-slate-500' :
+                            index === 2 ? 'bg-gradient-to-br from-orange-500/30 to-orange-600/30 text-orange-600' :
+                            'bg-gradient-to-br from-primary/20 to-primary/30 text-primary'
+                          }`}>
+                            {index + 1}
+                          </div>
+                        </div>
 
-          {/* Week Matchups */}
-          <div>
-            <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center">
-              <Calendar className="h-6 w-6 mr-2 text-primary" />
-              Week {leagueData.week} Matchups
-              {selectedWeek && selectedWeek < (currentWeek || 0) && (
-                <Badge variant="outline" className="ml-2">Completed</Badge>
-              )}
-              {selectedWeek && selectedWeek === currentWeek && (
-                <Badge variant="secondary" className="ml-2">Current</Badge>
-              )}
-              {selectedWeek && selectedWeek > (currentWeek || 0) && (
-                <Badge variant="outline" className="ml-2">Upcoming</Badge>
-              )}
-            </h2>
-            <Card className="p-6">
-              <div className="space-y-4">
-                {leagueData.matchups.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No matchups found for this week</p>
+                        {/* Team Logo - Fixed width column */}
+                        <div className="col-span-1 flex justify-center">
+                          {team.logo ? (
+                            <img 
+                              src={team.logo} 
+                              alt={team.teamName} 
+                              className="w-12 h-12 rounded-full object-cover border-2 border-border/30"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-primary/30 border-2 border-border/30 flex items-center justify-center">
+                              <Users className="w-6 h-6 text-primary" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Team Info - Flexible column */}
+                        <div className="col-span-4 min-w-0">
+                          <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                            {team.teamName}
+                          </h3>
+                          <p className="text-sm text-muted-foreground truncate">{team.owner}</p>
+                        </div>
+
+                        {/* Stats - Fixed width columns for alignment */}
+                        <div className={`col-span-6 grid ${team.playoffOdds !== undefined ? 'grid-cols-6' : 'grid-cols-5'} gap-4 items-center`}>
+                          {/* Record */}
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground mb-1">Record</div>
+                            <div className="flex items-center justify-center space-x-1">
+                              <span className="font-semibold text-sm">{team.wins}-{team.losses}</span>
+                              {team.ties > 0 && <span className="text-muted-foreground text-xs">-{team.ties}</span>}
+                            </div>
+                          </div>
+                          
+                          {/* Win % */}
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground mb-1">Win %</div>
+                            <Badge variant="secondary" className="text-xs">
+                              {Math.round(team.winPercentage * 1000) / 10}%
+                            </Badge>
+                          </div>
+                          
+                          {/* Points For */}
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground mb-1">Points For</div>
+                            <span className="font-semibold text-sm">{team.pointsFor?.toFixed(1) ?? '0.0'}</span>
+                          </div>
+                          
+                          {/* Points Against */}
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground mb-1">Points Against</div>
+                            <span className="font-semibold text-sm">{team.pointsAgainst?.toFixed(1) ?? '0.0'}</span>
+                          </div>
+                          
+                          {/* Streak */}
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground mb-1">Streak</div>
+                            <div className="flex items-center justify-center space-x-1">
+                              {getStreakIcon(team.streak)}
+                              <span className="font-semibold text-sm">{team.streak}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Playoff Odds */}
+                          {team.playoffOdds !== undefined && (
+                            <div className="text-center">
+                              <div className="text-xs text-muted-foreground mb-1">Playoff %</div>
+                              <Badge 
+                                variant="outline"
+                                className={`text-xs ${
+                                  team.playoffOdds >= 75
+                                    ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                                    : team.playoffOdds >= 50
+                                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                    : team.playoffOdds >= 25
+                                    ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                    : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                }`}
+                              >
+                                {team.playoffOdds.toFixed(0)}%
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  leagueData.matchups.map((matchup) => (
-                    <div key={matchup.matchupId} className="p-4 rounded-lg border">
-                      <div className="flex items-center justify-between mb-3">
-                        <Badge className={getMatchupStatusColor(matchup.status)}>
-                          {matchup.status.replace('_', ' ').toUpperCase()}
-                        </Badge>
-                        {matchup.isPlayoff && (
-                          <Badge variant="destructive">Playoff</Badge>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-3">
-                        {/* Away Team */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            {matchup.awayTeam.logo ? (
-                              <img 
-                                src={matchup.awayTeam.logo} 
-                                alt={matchup.awayTeam.teamName}
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                                <span className="text-xs font-bold">A</span>
-                              </div>
-                            )}
-                            <div>
-                              <h4 
-                                className="font-semibold cursor-pointer hover:text-blue-600 transition-colors"
-                                onClick={() => handleJumpToTeam(matchup.awayTeam.teamId)}
-                              >
-                                {matchup.awayTeam.teamName}
-                              </h4>
-                              <p className="text-sm text-muted-foreground">
-                                Proj: {matchup.awayTeam.projectedScore?.toFixed(1) ?? '0.0'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold">{matchup.awayTeam.score?.toFixed(1) ?? '0.0'}</p>
-                          </div>
-                        </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
-                        {/* Home Team */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            {matchup.homeTeam.logo ? (
-                              <img 
-                                src={matchup.homeTeam.logo} 
-                                alt={matchup.homeTeam.teamName}
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                                <span className="text-xs font-bold">H</span>
-                              </div>
-                            )}
-                            <div>
-                              <h4 
-                                className="font-semibold cursor-pointer hover:text-blue-600 transition-colors"
-                                onClick={() => handleJumpToTeam(matchup.homeTeam.teamId)}
+          {activeTab === 'matchups' && (
+            <div>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-foreground mb-2 flex items-center">
+                  <Calendar className="h-6 w-6 mr-2 text-primary" />
+                  Week {leagueData.week} Matchups
+                </h2>
+                <div className="flex items-center space-x-2">
+                  {selectedWeek && selectedWeek < (currentWeek || 0) && (
+                    <Badge variant="outline">Completed</Badge>
+                  )}
+                  {selectedWeek && selectedWeek === currentWeek && (
+                    <Badge variant="secondary">Current</Badge>
+                  )}
+                  {selectedWeek && selectedWeek > (currentWeek || 0) && (
+                    <Badge variant="outline">Upcoming</Badge>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {leagueData.matchups.length === 0 ? (
+                  <Card className="col-span-full">
+                    <CardContent className="p-12">
+                      <div className="text-center text-muted-foreground">
+                        <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No matchups found for this week</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  leagueData.matchups.map((matchup) => {
+                    // Calculate win probability (same logic as dashboard)
+                    const getTeamExpectedScore = (team: any): number => {
+                      const actual = team.score || 0
+                      const projected = team.projectedScore || 0
+                      
+                      if (actual === 0 || actual < 5) {
+                        return projected
+                      }
+                      if (actual >= projected) {
+                        return actual
+                      }
+                      return projected
+                    }
+                    
+                    const calculateWinProb = (teamScore: number, opponentScore: number): number => {
+                      const diff = teamScore - opponentScore
+                      const k = 0.02
+                      return 1 / (1 + Math.exp(-k * diff))
+                    }
+                    
+                    const awayExpected = getTeamExpectedScore(matchup.awayTeam)
+                    const homeExpected = getTeamExpectedScore(matchup.homeTeam)
+                    
+                    const awayWinProb = calculateWinProb(awayExpected, homeExpected) * 100
+                    const homeWinProb = calculateWinProb(homeExpected, awayExpected) * 100
+
+                    return (
+                      <Card key={matchup.matchupId} className="hover:shadow-lg transition-all duration-200">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-1.5">
+                              <Badge 
+                                variant="outline" 
+                                className={`text-[10px] px-1.5 py-0 ${getMatchupStatusColor(matchup.status)}`}
                               >
-                                {matchup.homeTeam.teamName}
-                              </h4>
-                              <p className="text-sm text-muted-foreground">
-                                Proj: {matchup.homeTeam.projectedScore?.toFixed(1) ?? '0.0'}
-                              </p>
+                                {matchup.status.replace('_', ' ')}
+                              </Badge>
+                              {matchup.isPlayoff && (
+                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Playoff</Badge>
+                              )}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold">{matchup.homeTeam.score?.toFixed(1) ?? '0.0'}</p>
+                          
+                          <div className="space-y-2.5">
+                            {/* Away Team */}
+                            <div 
+                              className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                              onClick={() => handleJumpToTeam(matchup.awayTeam.teamId)}
+                            >
+                              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                {matchup.awayTeam.logo ? (
+                                  <img 
+                                    src={matchup.awayTeam.logo} 
+                                    alt={matchup.awayTeam.teamName}
+                                    className="w-8 h-8 rounded-full object-cover border border-border/30 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/30 border border-border/30 flex items-center justify-center shrink-0">
+                                    <Users className="w-4 h-4 text-primary" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center space-x-1.5">
+                                    <span className="font-semibold text-sm truncate hover:text-primary transition-colors">
+                                      {matchup.awayTeam.teamName}
+                                    </span>
+                                    <Badge 
+                                      variant="outline"
+                                      className={`text-[9px] px-1 py-0 shrink-0 ${
+                                        awayWinProb >= 70 
+                                          ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                                          : awayWinProb >= 50
+                                          ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                          : awayWinProb >= 30
+                                          ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                          : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                      }`}
+                                    >
+                                      {awayWinProb.toFixed(0)}%
+                                    </Badge>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Proj: {matchup.awayTeam.projectedScore?.toFixed(1) ?? '0.0'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0 ml-2">
+                                <p className="text-lg font-bold">{matchup.awayTeam.score?.toFixed(1) ?? '0.0'}</p>
+                              </div>
+                            </div>
+
+                            {/* VS Divider */}
+                            <div className="flex items-center justify-center py-0.5">
+                              <div className="w-full h-px bg-border/30" />
+                              <span className="px-2 text-[10px] font-semibold text-muted-foreground">VS</span>
+                              <div className="w-full h-px bg-border/30" />
+                            </div>
+
+                            {/* Home Team */}
+                            <div 
+                              className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                              onClick={() => handleJumpToTeam(matchup.homeTeam.teamId)}
+                            >
+                              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                {matchup.homeTeam.logo ? (
+                                  <img 
+                                    src={matchup.homeTeam.logo} 
+                                    alt={matchup.homeTeam.teamName}
+                                    className="w-8 h-8 rounded-full object-cover border border-border/30 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/30 border border-border/30 flex items-center justify-center shrink-0">
+                                    <Users className="w-4 h-4 text-primary" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center space-x-1.5">
+                                    <span className="font-semibold text-sm truncate hover:text-primary transition-colors">
+                                      {matchup.homeTeam.teamName}
+                                    </span>
+                                    <Badge 
+                                      variant="outline"
+                                      className={`text-[9px] px-1 py-0 shrink-0 ${
+                                        homeWinProb >= 70 
+                                          ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                                          : homeWinProb >= 50
+                                          ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                          : homeWinProb >= 30
+                                          ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                          : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                      }`}
+                                    >
+                                      {homeWinProb.toFixed(0)}%
+                                    </Badge>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Proj: {matchup.homeTeam.projectedScore?.toFixed(1) ?? '0.0'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0 ml-2">
+                                <p className="text-lg font-bold">{matchup.homeTeam.score?.toFixed(1) ?? '0.0'}</p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                        </CardContent>
+                      </Card>
+                    )
+                  })
                 )}
               </div>
-            </Card>
-          </div>
-        </div>
-        )}
-        {(activeTab === 'rosters' || activeTab === 'matchups') && boxscoreData && boxscoreData.totalMatchups > 0 && (
-          <>
-          {/* Detailed Boxscore Data */}
-          <div className="mt-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-foreground flex items-center">
-                <Users className="h-6 w-6 mr-2 text-primary" />
-                Detailed Rosters
-                <Badge variant="secondary" className="ml-2">
-                  {boxscoreData.totalMatchups} Matchups
-                </Badge>
-              </h2>
-              <Button
-                onClick={() => setShowDetailedMatchups(!showDetailedMatchups)}
-                variant="outline"
-                size="sm"
-              >
-                {showDetailedMatchups ? 'Hide Rosters' : 'Show Rosters'}
-              </Button>
             </div>
-            
-            {showDetailedMatchups && (
-              <Card className="p-6">
-                <div className="space-y-8">
-                  {boxscoreData.matchups.map((matchup, matchupIdx) => (
-                    <div key={matchup.matchupId} id={`matchup-${matchupIdx}`} className="border-b last:border-0 pb-6 last:pb-0">
-                      <div className="mb-4">
-                        <div className="flex items-center space-x-4 text-sm">
-                          <div className="flex items-center space-x-2">
-                            {matchup.awayTeam.logo && (
-                              <img src={matchup.awayTeam.logo} alt={matchup.awayTeam.teamName} className="w-6 h-6 rounded-full object-cover" />
-                            )}
-                            <span className="font-medium">{matchup.awayTeam.teamName}</span>
-                            <span className="text-muted-foreground ml-2">
-                              {matchup.awayTeam.totalActual.toFixed(2)} pts
-                            </span>
-                          </div>
-                          <span className="text-muted-foreground">vs</span>
-                          <div className="flex items-center space-x-2">
-                            {matchup.homeTeam.logo && (
-                              <img src={matchup.homeTeam.logo} alt={matchup.homeTeam.teamName} className="w-6 h-6 rounded-full object-cover" />
-                            )}
-                            <span className="font-medium">{matchup.homeTeam.teamName}</span>
-                            <span className="text-muted-foreground ml-2">
-                              {matchup.homeTeam.totalActual.toFixed(2)} pts
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+          )}
+          {activeTab === 'rosters' && (
+            <div>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-foreground mb-2 flex items-center">
+                  <Users className="h-6 w-6 mr-2 text-primary" />
+                  Week {boxscoreData?.week || selectedWeek || 'N/A'} Rosters
+                </h2>
+              </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Away Team */}
-                        <div id={`matchup-${matchupIdx}-${matchup.awayTeam.teamId}`}>
-                          <h4 className="font-semibold text-foreground mb-2">{matchup.awayTeam.teamName}</h4>
-                          <div className="space-y-2">
-                            <div className="text-sm font-medium text-muted-foreground">Starters:</div>
-                            {matchup.awayTeam.starters.map((player, idx) => (
-                              <div key={idx} className="flex items-center justify-between text-sm">
-                                <div className="flex items-center space-x-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {getPositionLabel(player.position)}
-                                  </Badge>
-                                  <span>{player.fullName}</span>
-                                </div>
-                                <span className="font-semibold">{player.pointsActual.toFixed(2)}</span>
-                              </div>
-                            ))}
-                            <div className="text-sm font-medium text-muted-foreground mt-4">Bench:</div>
-                            {matchup.awayTeam.bench.map((player, idx) => (
-                              <div key={idx} className="flex items-center justify-between text-sm text-muted-foreground">
-                                <div className="flex items-center space-x-2">
-                                  <Badge variant="outline" className="text-xs opacity-50">
-                                    {getPositionLabel(player.position)}
-                                  </Badge>
-                                  <span>{player.fullName}</span>
-                                </div>
-                                <span>{player.pointsActual.toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Home Team */}
-                        <div id={`matchup-${matchupIdx}-${matchup.homeTeam.teamId}`}>
-                          <h4 className="font-semibold text-foreground mb-2">{matchup.homeTeam.teamName}</h4>
-                          <div className="space-y-2">
-                            <div className="text-sm font-medium text-muted-foreground">Starters:</div>
-                            {matchup.homeTeam.starters.map((player, idx) => (
-                              <div key={idx} className="flex items-center justify-between text-sm">
-                                <div className="flex items-center space-x-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {getPositionLabel(player.position)}
-                                  </Badge>
-                                  <span>{player.fullName}</span>
-                                </div>
-                                <span className="font-semibold">{player.pointsActual.toFixed(2)}</span>
-                              </div>
-                            ))}
-                            <div className="text-sm font-medium text-muted-foreground mt-4">Bench:</div>
-                            {matchup.homeTeam.bench.map((player, idx) => (
-                              <div key={idx} className="flex items-center justify-between text-sm text-muted-foreground">
-                                <div className="flex items-center space-x-2">
-                                  <Badge variant="outline" className="text-xs opacity-50">
-                                    {getPositionLabel(player.position)}
-                                  </Badge>
-                                  <span>{player.fullName}</span>
-                                </div>
-                                <span>{player.pointsActual.toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+              {!boxscoreData || boxscoreData.totalMatchups === 0 ? (
+                <Card>
+                  <CardContent className="p-12">
+                    <div className="text-center text-muted-foreground">
+                      <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No roster data available for this week</p>
                     </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-6">
+                  {boxscoreData.matchups.map((matchup, matchupIdx) => (
+                    <Card key={matchup.matchupId} className="overflow-hidden">
+                      <CardContent className="p-0">
+                        {/* Matchup Header */}
+                        <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-border/30 p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                              <div className="flex items-center space-x-3 flex-1">
+                                {matchup.awayTeam.logo && (
+                                  <img 
+                                    src={matchup.awayTeam.logo} 
+                                    alt={matchup.awayTeam.teamName} 
+                                    className="w-10 h-10 rounded-full object-cover border-2 border-border/30"
+                                  />
+                                )}
+                                <div>
+                                  <h3 className="font-bold text-lg">{matchup.awayTeam.teamName}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    {matchup.awayTeam.totalActual.toFixed(2)} pts
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="px-4">
+                                <span className="text-muted-foreground font-semibold">VS</span>
+                              </div>
+                              <div className="flex items-center space-x-3 flex-1">
+                                {matchup.homeTeam.logo && (
+                                  <img 
+                                    src={matchup.homeTeam.logo} 
+                                    alt={matchup.homeTeam.teamName} 
+                                    className="w-10 h-10 rounded-full object-cover border-2 border-border/30"
+                                  />
+                                )}
+                                <div>
+                                  <h3 className="font-bold text-lg">{matchup.homeTeam.teamName}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    {matchup.homeTeam.totalActual.toFixed(2)} pts
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Team Rosters */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                          {/* Away Team */}
+                          <div 
+                            id={`matchup-${matchupIdx}-${matchup.awayTeam.teamId}`}
+                            className="p-6 border-r border-border/30 last:border-r-0"
+                          >
+                            <div className="mb-4 pb-3 border-b border-border/20">
+                              <h4 className="font-semibold text-lg text-foreground">{matchup.awayTeam.teamName}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                Total: {matchup.awayTeam.totalActual.toFixed(2)} pts
+                                {matchup.awayTeam.totalProjected > 0 && (
+                                  <span className="ml-2">
+                                    (Proj: {matchup.awayTeam.totalProjected.toFixed(2)})
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div>
+                                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                                  Starters
+                                </div>
+                                <div className="space-y-2">
+                                  {matchup.awayTeam.starters.map((player, idx) => {
+                                    const hasPlayed = player.hasPlayed === true
+                                    const isPlaying = player.isPlaying === true
+                                    const notPlayed = player.notPlayed === true
+                                    
+                                    // Calculate boom/bust status
+                                    const getPlayerStatus = (actual: number, projected: number) => {
+                                      if (!projected || projected === 0) return null
+                                      const diff = actual - projected
+                                      const percentage = (diff / projected) * 100
+                                      
+                                      if (diff > 10 && percentage > 30) {
+                                        return { type: 'boom', diff, percentage }
+                                      } else if (diff < -10 && percentage < -30) {
+                                        return { type: 'bust', diff, percentage }
+                                      } else if (diff > 0) {
+                                        return { type: 'above', diff, percentage }
+                                      } else if (diff < 0) {
+                                        return { type: 'below', diff, percentage }
+                                      }
+                                      return null
+                                    }
+                                    
+                                    const status = getPlayerStatus(player.pointsActual || 0, player.pointsProjected || 0)
+
+                                    return (
+                                      <div 
+                                        key={idx} 
+                                        className={`flex items-center justify-between p-2.5 rounded-lg bg-card/50 border border-border/20 hover:bg-accent/50 transition-colors ${
+                                          isPlaying ? 'ring-2 ring-green-500/30' : ''
+                                        }`}
+                                      >
+                                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                          <Badge variant="outline" className="text-xs shrink-0">
+                                            {getPositionLabel(player.position)}
+                                          </Badge>
+                                          <div className="flex items-center space-x-1.5 flex-1 min-w-0">
+                                            <span className="text-sm font-medium truncate">{player.fullName}</span>
+                                            {/* NFL Team Badge */}
+                                            {player.proTeamId && (
+                                              <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0 border-border/30 bg-background/50">
+                                                <img 
+                                                  src={getTeamLogoWithFallback(player.proTeamId)} 
+                                                  alt={player.proTeamId}
+                                                  className="w-3 h-3 mr-0.5 rounded-sm"
+                                                  onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.style.display = 'none';
+                                                    if (target.parentElement) {
+                                                      target.parentElement.innerHTML = player.proTeamId || '';
+                                                    }
+                                                  }}
+                                                />
+                                                {player.proTeamId}
+                                              </Badge>
+                                            )}
+                                              {/* Game Status Icon */}
+                                              {hasPlayed && (
+                                                <span title="Game completed">
+                                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-400 shrink-0" />
+                                                </span>
+                                              )}
+                                              {isPlaying && (
+                                                <span title="Game in progress">
+                                                  <Play className="h-3.5 w-3.5 text-green-400 animate-pulse shrink-0" />
+                                                </span>
+                                              )}
+                                              {notPlayed && (
+                                                <span title="Game not started">
+                                                  <Clock className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                                                </span>
+                                              )}
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center space-x-2 shrink-0">
+                                          {/* Points Display */}
+                                          <div className="text-right">
+                                            {hasPlayed ? (
+                                              <>
+                                                <div className="text-sm font-bold">
+                                                  {player.pointsActual?.toFixed(2) || '0.00'}
+                                                </div>
+                                                {player.pointsProjected > 0 && (
+                                                  <div className="text-[10px] text-muted-foreground">
+                                                    of {player.pointsProjected.toFixed(2)}
+                                                  </div>
+                                                )}
+                                              </>
+                                            ) : isPlaying ? (
+                                              <>
+                                                <div className="text-sm font-bold text-green-400">
+                                                  {player.pointsActual?.toFixed(2) || '0.00'}
+                                                </div>
+                                                {player.pointsProjected > 0 && (
+                                                  <div className="text-[10px] text-muted-foreground">
+                                                    / {player.pointsProjected.toFixed(2)}
+                                                  </div>
+                                                )}
+                                              </>
+                                            ) : (
+                                              <>
+                                                <div className="text-sm font-bold text-orange-400">
+                                                  {player.pointsProjected?.toFixed(2) || '0.00'}
+                                                </div>
+                                              </>
+                                            )}
+                                          </div>
+                                          
+                                          {/* Boom/Bust Status Badge - Only show if player has played */}
+                                          {status && hasPlayed && (
+                                            <div className="shrink-0">
+                                              {status.type === 'boom' && (
+                                                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px] px-1.5 py-0">
+                                                  <TrendingUp className="h-3 w-3 mr-0.5" />
+                                                  +{status.percentage.toFixed(0)}%
+                                                </Badge>
+                                              )}
+                                              {status.type === 'bust' && (
+                                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px] px-1.5 py-0">
+                                                  <TrendingDown className="h-3 w-3 mr-0.5" />
+                                                  {status.percentage.toFixed(0)}%
+                                                </Badge>
+                                              )}
+                                              {status.type === 'above' && (
+                                                <Badge variant="outline" className="bg-green-500/10 text-green-300 border-green-500/20 text-[10px] px-1.5 py-0">
+                                                  +{status.diff.toFixed(1)}
+                                                </Badge>
+                                              )}
+                                              {status.type === 'below' && (
+                                                <Badge variant="outline" className="bg-red-500/10 text-red-300 border-red-500/20 text-[10px] px-1.5 py-0">
+                                                  {status.diff.toFixed(1)}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+
+                              {matchup.awayTeam.bench.length > 0 && (
+                                <div>
+                                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                                    Bench
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    {matchup.awayTeam.bench.map((player, idx) => (
+                                      <div 
+                                        key={idx} 
+                                        className="flex items-center justify-between p-2 rounded-lg text-muted-foreground opacity-75"
+                                      >
+                                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                          <Badge variant="outline" className="text-xs opacity-50 shrink-0">
+                                            {getPositionLabel(player.position)}
+                                          </Badge>
+                                          <span className="text-sm truncate">{player.fullName}</span>
+                                        </div>
+                                        <span className="text-sm shrink-0 ml-2">
+                                          {player.pointsActual.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Home Team */}
+                          <div 
+                            id={`matchup-${matchupIdx}-${matchup.homeTeam.teamId}`}
+                            className="p-6"
+                          >
+                            <div className="mb-4 pb-3 border-b border-border/20">
+                              <h4 className="font-semibold text-lg text-foreground">{matchup.homeTeam.teamName}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                Total: {matchup.homeTeam.totalActual.toFixed(2)} pts
+                                {matchup.homeTeam.totalProjected > 0 && (
+                                  <span className="ml-2">
+                                    (Proj: {matchup.homeTeam.totalProjected.toFixed(2)})
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div>
+                                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                                  Starters
+                                </div>
+                                <div className="space-y-2">
+                                  {matchup.homeTeam.starters.map((player, idx) => {
+                                    const hasPlayed = player.hasPlayed === true
+                                    const isPlaying = player.isPlaying === true
+                                    const notPlayed = player.notPlayed === true
+                                    
+                                    // Calculate boom/bust status
+                                    const getPlayerStatus = (actual: number, projected: number) => {
+                                      if (!projected || projected === 0) return null
+                                      const diff = actual - projected
+                                      const percentage = (diff / projected) * 100
+                                      
+                                      if (diff > 10 && percentage > 30) {
+                                        return { type: 'boom', diff, percentage }
+                                      } else if (diff < -10 && percentage < -30) {
+                                        return { type: 'bust', diff, percentage }
+                                      } else if (diff > 0) {
+                                        return { type: 'above', diff, percentage }
+                                      } else if (diff < 0) {
+                                        return { type: 'below', diff, percentage }
+                                      }
+                                      return null
+                                    }
+                                    
+                                    const status = getPlayerStatus(player.pointsActual || 0, player.pointsProjected || 0)
+
+                                    return (
+                                      <div 
+                                        key={idx} 
+                                        className={`flex items-center justify-between p-2.5 rounded-lg bg-card/50 border border-border/20 hover:bg-accent/50 transition-colors ${
+                                          isPlaying ? 'ring-2 ring-green-500/30' : ''
+                                        }`}
+                                      >
+                                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                          <Badge variant="outline" className="text-xs shrink-0">
+                                            {getPositionLabel(player.position)}
+                                          </Badge>
+                                          <div className="flex items-center space-x-1.5 flex-1 min-w-0">
+                                            <span className="text-sm font-medium truncate">{player.fullName}</span>
+                                            {/* NFL Team Badge */}
+                                            {player.proTeamId && (
+                                              <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0 border-border/30 bg-background/50">
+                                                <img 
+                                                  src={getTeamLogoWithFallback(player.proTeamId)} 
+                                                  alt={player.proTeamId}
+                                                  className="w-3 h-3 mr-0.5 rounded-sm"
+                                                  onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.style.display = 'none';
+                                                    if (target.parentElement) {
+                                                      target.parentElement.innerHTML = player.proTeamId || '';
+                                                    }
+                                                  }}
+                                                />
+                                                {player.proTeamId}
+                                              </Badge>
+                                            )}
+                                              {/* Game Status Icon */}
+                                              {hasPlayed && (
+                                                <span title="Game completed">
+                                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-400 shrink-0" />
+                                                </span>
+                                              )}
+                                              {isPlaying && (
+                                                <span title="Game in progress">
+                                                  <Play className="h-3.5 w-3.5 text-green-400 animate-pulse shrink-0" />
+                                                </span>
+                                              )}
+                                              {notPlayed && (
+                                                <span title="Game not started">
+                                                  <Clock className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                                                </span>
+                                              )}
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center space-x-2 shrink-0">
+                                          {/* Points Display */}
+                                          <div className="text-right">
+                                            {hasPlayed ? (
+                                              <>
+                                                <div className="text-sm font-bold">
+                                                  {player.pointsActual?.toFixed(2) || '0.00'}
+                                                </div>
+                                                {player.pointsProjected > 0 && (
+                                                  <div className="text-[10px] text-muted-foreground">
+                                                    of {player.pointsProjected.toFixed(2)}
+                                                  </div>
+                                                )}
+                                              </>
+                                            ) : isPlaying ? (
+                                              <>
+                                                <div className="text-sm font-bold text-green-400">
+                                                  {player.pointsActual?.toFixed(2) || '0.00'}
+                                                </div>
+                                                {player.pointsProjected > 0 && (
+                                                  <div className="text-[10px] text-muted-foreground">
+                                                    / {player.pointsProjected.toFixed(2)}
+                                                  </div>
+                                                )}
+                                              </>
+                                            ) : (
+                                              <>
+                                                <div className="text-sm font-bold text-orange-400">
+                                                  {player.pointsProjected?.toFixed(2) || '0.00'}
+                                                </div>
+                                              </>
+                                            )}
+                                          </div>
+                                          
+                                          {/* Boom/Bust Status Badge - Only show if player has played */}
+                                          {status && hasPlayed && (
+                                            <div className="shrink-0">
+                                              {status.type === 'boom' && (
+                                                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px] px-1.5 py-0">
+                                                  <TrendingUp className="h-3 w-3 mr-0.5" />
+                                                  +{status.percentage.toFixed(0)}%
+                                                </Badge>
+                                              )}
+                                              {status.type === 'bust' && (
+                                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px] px-1.5 py-0">
+                                                  <TrendingDown className="h-3 w-3 mr-0.5" />
+                                                  {status.percentage.toFixed(0)}%
+                                                </Badge>
+                                              )}
+                                              {status.type === 'above' && (
+                                                <Badge variant="outline" className="bg-green-500/10 text-green-300 border-green-500/20 text-[10px] px-1.5 py-0">
+                                                  +{status.diff.toFixed(1)}
+                                                </Badge>
+                                              )}
+                                              {status.type === 'below' && (
+                                                <Badge variant="outline" className="bg-red-500/10 text-red-300 border-red-500/20 text-[10px] px-1.5 py-0">
+                                                  {status.diff.toFixed(1)}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+
+                              {matchup.homeTeam.bench.length > 0 && (
+                                <div>
+                                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                                    Bench
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    {matchup.homeTeam.bench.map((player, idx) => (
+                                      <div 
+                                        key={idx} 
+                                        className="flex items-center justify-between p-2 rounded-lg text-muted-foreground opacity-75"
+                                      >
+                                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                          <Badge variant="outline" className="text-xs opacity-50 shrink-0">
+                                            {getPositionLabel(player.position)}
+                                          </Badge>
+                                          <span className="text-sm truncate">{player.fullName}</span>
+                                        </div>
+                                        <span className="text-sm shrink-0 ml-2">
+                                          {player.pointsActual.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-              </Card>
-            )}
-          </div>
-          </>
-        )}
-          </>
+              )}
+            </div>
+          )}
+        </>
         )}
 
         {/* Errors */}

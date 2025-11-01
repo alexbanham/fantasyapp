@@ -396,6 +396,13 @@ export const syncCurrentWeekESPNData = async () => {
   return response.data
 }
 
+export const syncRosteredPlayersCurrentWeek = async () => {
+  const response = await api.post('/sync/weekly/rostered-players', {
+    updateDatabase: true
+  })
+  return response.data
+}
+
 export const getESPNInjuries = async (limit?: number, days?: number) => {
   const params = new URLSearchParams()
   if (limit) params.append('limit', limit.toString())
@@ -647,6 +654,7 @@ export interface LeagueStanding {
   streak: string
   playoffSeed: number | null
   logo: string | null
+  playoffOdds?: number // Playoff probability percentage
 }
 
 export interface LeagueMatchup {
@@ -696,6 +704,11 @@ export interface PlayerLine {
   pointsActual: number
   pointsProjected: number
   isStarter: boolean
+  gameStatus?: string
+  hasPlayed?: boolean
+  isPlaying?: boolean
+  notPlayed?: boolean
+  proTeamId?: string
 }
 
 export interface TeamBoxscore {

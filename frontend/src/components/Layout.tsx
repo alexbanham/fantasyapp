@@ -10,7 +10,8 @@ import {
   Database,
   Settings,
   Trophy,
-  TrendingUp
+  TrendingUp,
+  Newspaper
 } from 'lucide-react'
 import { Button } from './ui/button'
 import ColorSchemeToggler from './ColorSchemeToggler'
@@ -30,6 +31,7 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
     { name: 'Analytics', href: '/analytics', icon: TrendingUp, current: location.pathname === '/analytics' },
     { name: 'Players', href: '/players', icon: Search, current: location.pathname.startsWith('/players') },
     { name: 'Games', href: '/games', icon: Calendar, current: location.pathname === '/games' },
+    { name: 'News', href: '/news', icon: Newspaper, current: location.pathname === '/news' },
     { name: 'Data', href: '/data', icon: Database, current: location.pathname === '/data' },
   ]
 

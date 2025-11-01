@@ -12,6 +12,7 @@ import PlayerBrowser from './pages/PlayerBrowser'
 import PlayerProfile from './pages/PlayerProfile'
 import Games from './pages/Games'
 import Data from './pages/Data'
+import News from './pages/News'
 
 function AppContent() {
   const { colorScheme } = useColorScheme()
@@ -57,6 +58,7 @@ function AppContent() {
             <Route path="/games" element={<Games />} />
             <Route path="/players" element={<PlayerBrowser />} />
             <Route path="/players/:playerId" element={<PlayerProfile />} />
+            <Route path="/news" element={<News />} />
             <Route path="/data" element={<Data />} />
           </Routes>
         </Layout>

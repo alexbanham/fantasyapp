@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react'
+import { Calendar } from 'lucide-react'
 import LiveScoreStrip from '../components/LiveScoreStrip'
-import NewsFeed from '../components/dashboard/NewsFeed'
 import ConfigurationModal from '../components/dashboard/ConfigurationModal'
 import NFLWeekDisplay from '../components/dashboard/NFLWeekDisplay'
 import GameHighlights from '../components/dashboard/GameHighlights'
+import MatchupModal from '../components/dashboard/MatchupModal'
 import { 
   usePollingStatus, 
   useSyncOperations, 
   useConfig
 } from '../hooks/useDashboard'
 import { ConfigState } from '../types/dashboard'
-import { getLiveGamesOnly } from '../services/api'
+import { getLiveGamesOnly, getLeagueOverview, getLeagueBoxscores, syncRosteredPlayersCurrentWeek, LeagueMatchup, DetailedMatchup } from '../services/api'
+import { Card, CardContent } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
 
 interface DashboardProps {
   configModalOpen: boolean
@@ -23,13 +26,16 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
   const { syncState, syncFantasyNewsData, syncAllPlayersESPN, syncCurrentWeekPlayers, syncAllBoxscores } = useSyncOperations()
   const { config, configState, setConfigState, updateWeek, updateSeason, autoUpdateWeekData, fetchConfig } = useConfig()
   
-  // TODO: Load user roster and followed entities from config/user data
-  const userRoster: string[] = []
-  const followedEntities: string[] = []
-
   // Check if there are live games
   const [hasLiveGames, setHasLiveGames] = useState(false)
   const [checkingLiveGames, setCheckingLiveGames] = useState(true)
+  
+  // Matchups state
+  const [matchups, setMatchups] = useState<LeagueMatchup[]>([])
+  const [detailedMatchups, setDetailedMatchups] = useState<DetailedMatchup[]>([])
+  const [loadingMatchups, setLoadingMatchups] = useState(true)
+  const [selectedMatchup, setSelectedMatchup] = useState<DetailedMatchup | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
 
   useEffect(() => {
     const checkLiveGames = async () => {
@@ -77,6 +83,70 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
     setConfigState(prev => ({ ...prev, ...updates }))
   }
 
+  // Fetch matchups
+  const fetchMatchups = async () => {
+    if (!config?.currentWeek || !config?.currentSeason) return
+    
+    try {
+      setLoadingMatchups(true)
+      
+      // Sync rostered players for current week first to ensure data is up to date
+      // Only sync rostered players (not all players) for efficiency
+      try {
+        await syncRosteredPlayersCurrentWeek()
+      } catch (syncError) {
+        console.warn('Error syncing rostered players (continuing anyway):', syncError)
+        // Continue even if sync fails - user might have stale data but can still view matchups
+      }
+      
+      // Fetch basic matchup data
+      const leagueData = await getLeagueOverview(
+        config.currentSeason,
+        undefined,
+        config.currentWeek
+      )
+      
+      if (leagueData.success && leagueData.matchups) {
+        setMatchups(leagueData.matchups)
+      }
+      
+      // Fetch detailed boxscore data
+      const boxscoreData = await getLeagueBoxscores(
+        config.currentSeason,
+        config.currentWeek
+      )
+      
+      if (boxscoreData.success && boxscoreData.matchups) {
+        setDetailedMatchups(boxscoreData.matchups)
+      }
+    } catch (error) {
+      console.error('Error fetching matchups:', error)
+    } finally {
+      setLoadingMatchups(false)
+    }
+  }
+
+  // Fetch matchups when config changes
+  useEffect(() => {
+    if (config?.currentWeek && config?.currentSeason) {
+      fetchMatchups()
+    }
+  }, [config?.currentWeek, config?.currentSeason])
+
+  // Handle matchup click
+  const handleMatchupClick = (matchupId: number) => {
+    const detailedMatchup = detailedMatchups.find(m => m.matchupId === matchupId)
+    if (detailedMatchup) {
+      setSelectedMatchup(detailedMatchup)
+      setModalOpen(true)
+    }
+  }
+
+  // Get detailed matchup for a basic matchup
+  const getDetailedMatchup = (matchup: LeagueMatchup): DetailedMatchup | null => {
+    return detailedMatchups.find(m => m.matchupId === matchup.matchupId) || null
+  }
+
   return (
     <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8">
@@ -96,15 +166,224 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
             {/* Highlights - Show when no live games (and not actively checking) */}
             {!checkingLiveGames && !hasLiveGames && (
               <div className="mb-6">
-                <GameHighlights />
+                <GameHighlights 
+                  week={config?.currentWeek} 
+                  season={config?.currentSeason} 
+                />
               </div>
             )}
 
-          {/* News Feed */}
-          <NewsFeed 
-            userRoster={userRoster}
-            followedEntities={followedEntities}
-          />
+            {/* Fantasy Matchups */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  <h2 className="text-2xl font-bold text-foreground">
+                    Week {config?.currentWeek || 'N/A'} Matchups
+                  </h2>
+                  {loadingMatchups && (
+                    <Badge variant="secondary" className="ml-2">Loading...</Badge>
+                  )}
+                </div>
+              </div>
+
+              {loadingMatchups ? (
+                <Card>
+                  <CardContent className="p-8">
+                    <div className="text-center text-muted-foreground">
+                      Loading matchups...
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : matchups.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8">
+                    <div className="text-center text-muted-foreground">
+                      <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No matchups found for this week</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {matchups.map((matchup) => {
+                    const detailed = getDetailedMatchup(matchup)
+                    const hasDetailed = !!detailed
+                    
+                    // Calculate expected score for win probability
+                    // Primarily based on projected scores, with actuals used when available
+                    // Since we don't have player-level status in dashboard cards:
+                    // - If actual is very low/zero: games haven't started, use projected
+                    // - If actual < projected: use projected (favors projection, assumes gap is unplayed players)
+                    // - If actual >= projected: use actual (all players have played and met/exceeded)
+                    const getTeamExpectedScore = (team: any): number => {
+                      const actual = team.score || 0
+                      const projected = team.projectedScore || 0
+                      
+                      // If no actual score yet or very low, use projected (games haven't started)
+                      if (actual === 0 || actual < 5) {
+                        return projected
+                      }
+                      
+                      // If actual equals or exceeds projected, use actual
+                      // (all players have played and met/exceeded projections)
+                      if (actual >= projected) {
+                        return actual
+                      }
+                      
+                      // Actual < projected: primarily use projected
+                      // This assumes the gap represents players who haven't played yet
+                      // and will score their projected points
+                      return projected
+                    }
+                    
+                    const calculateWinProb = (teamScore: number, opponentScore: number): number => {
+                      const diff = teamScore - opponentScore
+                      const k = 0.02 // ESPN's sensitivity factor (validated to match their calculations)
+                      return 1 / (1 + Math.exp(-k * diff))
+                    }
+                    
+                    const awayExpected = getTeamExpectedScore(matchup.awayTeam)
+                    const homeExpected = getTeamExpectedScore(matchup.homeTeam)
+                    
+                    const awayWinProb = calculateWinProb(awayExpected, homeExpected) * 100
+                    const homeWinProb = calculateWinProb(homeExpected, awayExpected) * 100
+                    
+                    return (
+                      <Card
+                        key={matchup.matchupId}
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-primary/10 hover:border-primary/30 ${
+                          hasDetailed ? 'hover:scale-[1.02]' : 'opacity-75'
+                        }`}
+                        onClick={() => hasDetailed && handleMatchupClick(matchup.matchupId)}
+                      >
+                        <CardContent className="p-5">
+                          {/* Status Badge */}
+                          <div className="flex items-center justify-between mb-4">
+                            <Badge 
+                              variant={
+                                matchup.status === 'FINAL' ? 'default' :
+                                matchup.status === 'IN_PROGRESS' ? 'secondary' :
+                                'outline'
+                              }
+                              className="text-xs"
+                            >
+                              {matchup.status.replace('_', ' ')}
+                            </Badge>
+                            {matchup.isPlayoff && (
+                              <Badge variant="destructive" className="text-xs">Playoff</Badge>
+                            )}
+                          </div>
+
+                          {/* Teams */}
+                          <div className="space-y-3">
+                            {/* Away Team */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                {matchup.awayTeam.logo && (
+                                  <img
+                                    src={matchup.awayTeam.logo}
+                                    alt={matchup.awayTeam.teamName}
+                                    className="w-8 h-8 rounded-full object-cover shrink-0"
+                                  />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-semibold text-sm truncate block">
+                                    {matchup.awayTeam.teamName}
+                                  </span>
+                                  <Badge 
+                                    variant="outline"
+                                    className={`text-[10px] px-1.5 py-0 ${
+                                      awayWinProb >= 70 
+                                        ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                                        : awayWinProb >= 50
+                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                        : awayWinProb >= 30
+                                        ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                        : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                    }`}
+                                  >
+                                    {awayWinProb.toFixed(0)}%
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0 ml-2">
+                                <div className="text-xl font-bold">
+                                  {matchup.awayTeam.score?.toFixed(1) || '0.0'}
+                                </div>
+                                {matchup.awayTeam.projectedScore > 0 && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Proj: {matchup.awayTeam.projectedScore.toFixed(1)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* VS Divider */}
+                            <div className="flex items-center justify-center py-1">
+                              <div className="w-full h-px bg-border/30" />
+                              <span className="px-2 text-xs text-muted-foreground">VS</span>
+                              <div className="w-full h-px bg-border/30" />
+                            </div>
+
+                            {/* Home Team */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                {matchup.homeTeam.logo && (
+                                  <img
+                                    src={matchup.homeTeam.logo}
+                                    alt={matchup.homeTeam.teamName}
+                                    className="w-8 h-8 rounded-full object-cover shrink-0"
+                                  />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-semibold text-sm truncate block">
+                                    {matchup.homeTeam.teamName}
+                                  </span>
+                                  <Badge 
+                                    variant="outline"
+                                    className={`text-[10px] px-1.5 py-0 ${
+                                      homeWinProb >= 70 
+                                        ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                                        : homeWinProb >= 50
+                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                        : homeWinProb >= 30
+                                        ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                        : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                    }`}
+                                  >
+                                    {homeWinProb.toFixed(0)}%
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0 ml-2">
+                                <div className="text-xl font-bold">
+                                  {matchup.homeTeam.score?.toFixed(1) || '0.0'}
+                                </div>
+                                {matchup.homeTeam.projectedScore > 0 && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Proj: {matchup.homeTeam.projectedScore.toFixed(1)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Click hint */}
+                          {hasDetailed && (
+                            <div className="mt-4 pt-4 border-t border-border/20">
+                              <div className="text-xs text-center text-muted-foreground">
+                                Click to view detailed rosters
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
 
         </div>
       </div>
@@ -127,6 +406,16 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
         onSyncAllPlayers={syncAllPlayersESPN}
         onSyncCurrentWeek={syncCurrentWeekPlayers}
         onSyncAllBoxscores={syncAllBoxscores}
+      />
+
+      {/* Matchup Modal */}
+      <MatchupModal
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false)
+          setSelectedMatchup(null)
+        }}
+        matchup={selectedMatchup}
       />
     </div>
   )
