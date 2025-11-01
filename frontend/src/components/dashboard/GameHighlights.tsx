@@ -461,26 +461,37 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, s
                       
                       {/* Matchup Info */}
                       <div className="mb-2 pt-2 border-t border-border/20">
-                        <div className="text-[10px] text-muted-foreground mb-1">vs {player.opponent_team_name}</div>
-                        <div className="flex items-center justify-between text-[10px]">
+                        <div className="text-[10px] text-muted-foreground mb-1.5">vs {player.opponent_team_name}</div>
+                        
+                        {/* Win Probability Impact */}
+                        <div className="flex items-center justify-between text-[10px] mb-1">
                           <span className="text-muted-foreground">
-                            {player.projectedWinProb.toFixed(1)}% → {player.actualWinProb.toFixed(1)}%
+                            Win %: {player.projectedWinProb.toFixed(1)}% → {player.actualWinProb.toFixed(1)}%
                           </span>
                           <span className={`font-semibold ${
-                            player.projectedTotalImpact !== undefined && player.projectedTotalImpact > 0 
-                              ? 'text-green-400' 
-                              : player.projectedTotalImpact !== undefined && player.projectedTotalImpact < 0
-                              ? 'text-red-400'
-                              : player.winProbImpact > 0 
+                            player.winProbImpact > 0 
                               ? 'text-green-400' 
                               : 'text-red-400'
                           }`}>
-                            {player.projectedTotalImpact !== undefined 
-                              ? (player.projectedTotalImpact > 0 ? '+' : '') + player.projectedTotalImpact.toFixed(1) + '%'
-                              : (player.winProbImpact > 0 ? '+' : '') + player.winProbImpact.toFixed(1) + '%'
-                            }
+                            {(player.winProbImpact > 0 ? '+' : '') + player.winProbImpact.toFixed(1)}% win prob
                           </span>
                         </div>
+                        
+                        {/* Projected Total Impact (if available) */}
+                        {player.projectedTotalImpact !== undefined && (
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-muted-foreground">
+                              Team Impact:
+                            </span>
+                            <span className={`font-semibold ${
+                              player.projectedTotalImpact > 0 
+                                ? 'text-green-400' 
+                                : 'text-red-400'
+                            }`}>
+                              {(player.projectedTotalImpact > 0 ? '+' : '') + player.projectedTotalImpact.toFixed(1)}% of projected
+                            </span>
+                          </div>
+                        )}
                       </div>
                       
                       {/* Points */}
