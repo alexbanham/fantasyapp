@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { 
   Menu, 
@@ -25,6 +25,18 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
 
+  // Prevent body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [sidebarOpen])
+
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home, current: location.pathname === '/' },
     { name: 'League', href: '/league', icon: Trophy, current: location.pathname === '/league' },
@@ -38,33 +50,38 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
   return (
     <div className="min-h-screen">
       {/* Mobile sidebar */}
-      <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 w-64 border-r border-border/30">
-          <div className="flex items-center justify-between p-4 border-b border-border">
-            <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 flex items-center justify-center">
-              <Crown className="h-6 w-6 text-primary drop-shadow-lg" />
+      <div className={`fixed inset-0 z-[60] lg:hidden transition-opacity duration-300 ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        {/* Backdrop - Mobile only */}
+        <div 
+          className={`fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`} 
+          onClick={() => setSidebarOpen(false)} 
+        />
+        {/* Sidebar Panel - Mobile only */}
+        <div className={`fixed inset-y-0 left-0 w-64 glass border-r border-border/30 shadow-xl transition-transform duration-300 ease-in-out lg:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="flex items-center justify-between p-4 border-b border-border/30 glass">
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                <Crown className="h-6 w-6 text-primary drop-shadow-lg" />
+              </div>
+              <span className="text-base sm:text-lg font-semibold text-foreground tracking-tight truncate">Fantasy Footballin</span>
             </div>
-              <span className="text-lg font-semibold text-foreground tracking-tight">Fantasy Football Fuck</span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)}>
+            <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} className="shrink-0 text-foreground hover:text-foreground">
               <X className="h-5 w-5" />
             </Button>
           </div>
-          <nav className="p-4 space-y-2">
+          <nav className="p-4 space-y-2 overflow-y-auto h-[calc(100vh-73px)]">
             {navigation.map((item) => (
               <Link
                 key={item.name}
                 to={item.href}
-                className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   item.current
                     ? 'bg-primary/20 text-primary border border-primary/30'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 }`}
                 onClick={() => setSidebarOpen(false)}
               >
-                <item.icon className="h-5 w-5" />
+                <item.icon className="h-5 w-5 shrink-0" />
                 <span>{item.name}</span>
               </Link>
             ))}
@@ -103,29 +120,29 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
       </div>
 
       {/* Top bar - Fixed outside of scrollable content */}
-      <div className="fixed top-0 right-0 z-50 border-b border-border/30 lg:left-64 backdrop-blur-sm bg-background/10">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center space-x-4">
+      <div className="fixed top-0 left-0 right-0 z-40 border-b border-border/30 lg:left-64 backdrop-blur-md glass lg:backdrop-blur-sm lg:bg-background/10">
+        <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3">
+          <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden"
+              className="lg:hidden shrink-0"
               onClick={() => setSidebarOpen(true)}
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-medium text-foreground tracking-wide">
+            <div className="hidden sm:block min-w-0">
+              <h1 className="text-lg sm:text-xl font-medium text-foreground tracking-wide truncate">
                 {navigation.find(item => item.current)?.name || 'Fantasy Football Analysis Assistant'}
               </h1>
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
             <ColorSchemeToggler />
             {onConfigClick && (
               <>
-                <div className="h-6 w-px bg-border" />
+                <div className="h-6 w-px bg-border hidden sm:block" />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -136,11 +153,12 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
                 </Button>
               </>
             )}
-            <div className="h-6 w-px bg-border" />
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <div className="h-6 w-px bg-border hidden sm:block" />
+            <div className="hidden md:flex items-center space-x-2 text-sm text-muted-foreground">
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
               <span>Live Data</span>
             </div>
+            <div className="md:hidden w-2 h-2 bg-primary rounded-full animate-pulse shrink-0" />
           </div>
         </div>
       </div>
@@ -148,7 +166,7 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Page content */}
-        <main className="flex-1 pt-16">
+        <main className="flex-1 pt-14 sm:pt-16">
           {children}
         </main>
       </div>

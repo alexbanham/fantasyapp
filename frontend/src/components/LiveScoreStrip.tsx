@@ -62,6 +62,8 @@ interface LiveScoreStripProps {
 const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRefresh }: LiveScoreStripProps) => {
   const [games, setGames] = useState<Game[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -72,6 +74,7 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
   const expandedGamesRef = useRef<Set<string>>(new Set())
   const loadingScorersRef = useRef<Set<string>>(new Set())
   const onLiveGamesRefreshRef = useRef(onLiveGamesRefresh)
+  const hasLoadedOnceRef = useRef(false)
   
   // Update ref when prop changes (doesn't cause re-render)
   useEffect(() => {
@@ -113,7 +116,15 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
 
   // Poll for live games
   useEffect(() => {
-    const fetchLiveGames = async () => {
+    const fetchLiveGames = async (isInitialLoad = false) => {
+      // Only show loading spinner on initial load
+      if (isInitialLoad) {
+        setIsLoading(true)
+      } else if (hasLoadedOnceRef.current) {
+        // For subsequent updates, use a subtle refreshing indicator
+        setIsRefreshing(true)
+      }
+      
       try {
         const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
         const response = await fetch(`${API_BASE}/live?live_only=true`)
@@ -160,6 +171,8 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
           setLastUpdated(new Date())
           setError(null)
           setIsOnline(true)
+          setHasLoadedOnce(true)
+          hasLoadedOnceRef.current = true
           
           // Sync current week data to keep fantasy scorers up to date
           if (onLiveGamesRefreshRef.current && newGames.length > 0) {
@@ -184,16 +197,17 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
         setIsOnline(false)
       } finally {
         setIsLoading(false)
+        setIsRefreshing(false)
       }
     }
 
     // Initial fetch
-    fetchLiveGames()
+    fetchLiveGames(true)
 
     // Only poll if polling is active
     let interval: NodeJSTimeout | null = null
     if (isPollingActive) {
-      interval = setInterval(fetchLiveGames, 30000) // Poll every 30 seconds
+      interval = setInterval(() => fetchLiveGames(false), 30000) // Poll every 30 seconds
     }
 
     return () => {
@@ -279,7 +293,12 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
   }
 
   const refreshGames = async () => {
-    setIsLoading(true)
+    // For manual refresh, use refreshing indicator if data already loaded
+    if (hasLoadedOnceRef.current) {
+      setIsRefreshing(true)
+    } else {
+      setIsLoading(true)
+    }
     try {
       const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
       const response = await fetch(`${API_BASE}/live/poll`, { method: 'POST' })
@@ -295,6 +314,8 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
           setGames(newGames)
           setLastUpdated(new Date())
           setError(null)
+          setHasLoadedOnce(true)
+          hasLoadedOnceRef.current = true
           
           // Sync current week data to keep fantasy scorers up to date
           if (onLiveGamesRefreshRef.current && newGames.length > 0) {
@@ -310,6 +331,7 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
     } catch (err) {
     } finally {
       setIsLoading(false)
+      setIsRefreshing(false)
     }
   }
 
@@ -363,26 +385,26 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
         {/* Premium Header */}
         <div className="relative bg-gradient-to-r from-charcoal-900/50 via-slate-900/50 to-zinc-900/50 border-b border-border/20">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-purple-600/5 to-emerald-600/5"></div>
-          <div className="relative flex items-center justify-between p-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2">
+          <div className="relative flex items-center justify-between p-2 sm:p-3 md:p-4">
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              <div className="flex items-center space-x-1.5 sm:space-x-2 min-w-0">
                 {isOnline ? (
-                  <div className="relative">
-                    <Wifi className="h-5 w-5 text-green-400" />
-                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <div className="relative shrink-0">
+                    <Wifi className="h-4 w-4 sm:h-5 sm:w-5 text-green-400" />
+                    <div className="absolute -top-1 -right-1 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full animate-pulse"></div>
                   </div>
                 ) : (
-                  <WifiOff className="h-5 w-5 text-red-400" />
+                  <WifiOff className="h-4 w-4 sm:h-5 sm:w-5 text-red-400 shrink-0" />
                 )}
-                <div>
-                  <h3 className="text-lg font-bold bg-gradient-to-r from-charcoal-200 via-slate-200 to-zinc-200 bg-clip-text text-transparent">
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base md:text-lg font-bold bg-gradient-to-r from-charcoal-200 via-slate-200 to-zinc-200 bg-clip-text text-transparent truncate">
                     Live Scoreboard
                   </h3>
-                  <p className="text-xs text-muted-foreground">Real-time NFL scores</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">Real-time NFL scores</p>
                 </div>
               </div>
               {lastUpdated && (
-                <div className="hidden sm:flex items-center space-x-1 text-xs text-muted-foreground">
+                <div className="hidden md:flex items-center space-x-1 text-xs text-muted-foreground ml-2 shrink-0">
                   <Clock className="h-3 w-3" />
                   <span>Updated {lastUpdated.toLocaleTimeString()}</span>
                 </div>
@@ -392,16 +414,16 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
               size="sm" 
               variant="ghost" 
               onClick={refreshGames} 
-              disabled={isLoading}
-              className="hover:bg-background/20 transition-all duration-200"
+              disabled={isLoading || isRefreshing}
+              className="hover:bg-background/20 transition-all duration-200 shrink-0 p-1.5 sm:p-2"
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${(isLoading || isRefreshing) ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
 
         {/* Games Container */}
-        <div className="p-4">
+        <div className="p-2 sm:p-3 md:p-4">
           {games.length === 0 ? (
             <div className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gradient-to-br from-charcoal-500/20 to-slate-500/20 rounded-full flex items-center justify-center mb-4">
@@ -417,7 +439,7 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
               )}
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {games.map((game) => {
                 const isExpanded = expandedGames.has(game.eventId)
                 const awayAnimating = scoreAnimations.get(game.eventId)?.away || false
@@ -426,46 +448,76 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                 return (
                   <div 
                     key={game.eventId} 
-                    className="group relative overflow-hidden rounded-xl border border-border/20 bg-gradient-to-r from-background/50 to-background/30 hover:from-background/70 hover:to-background/50 transition-all duration-300 hover:shadow-lg hover:shadow-black/10"
+                    className="group relative overflow-hidden rounded-lg sm:rounded-xl border border-border/20 bg-gradient-to-r from-background/50 to-background/30 hover:from-background/70 hover:to-background/50 transition-all duration-300 hover:shadow-lg hover:shadow-black/10"
                   >
                     {/* Animated Background */}
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-purple-600/5 to-emerald-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                     
                     {/* Main Game Card */}
-                    <div className="relative p-4">
-                      <div className="flex items-center justify-between">
-                        {/* Away Team */}
-                        <div className="flex items-center justify-between flex-1 min-w-0">
-                          <div className="flex items-center space-x-3">
-                            {/* Team Logo */}
-                            <div className="w-10 h-10 rounded-full overflow-hidden border border-border/30 bg-background/50">
+                    <div className="relative p-2 sm:p-3 md:p-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+                        {/* Mobile: Simplified layout for small screens */}
+                        <div className="flex items-center justify-between w-full sm:hidden">
+                          <div className="flex items-center space-x-2 flex-1 min-w-0">
+                            <div className="w-8 h-8 rounded-full overflow-hidden border border-border/30 bg-background/50 shrink-0">
                               <img 
                                 src={getTeamLogoWithFallback(game.awayTeam.abbreviation)} 
                                 alt={`${game.awayTeam.name} logo`}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  // Fallback to abbreviation if logo fails to load
                                   const target = e.target as HTMLImageElement;
                                   target.style.display = 'none';
                                   const parent = target.parentElement;
                                   if (parent) {
-                                    parent.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500/20 to-purple-500/20"><span class="text-sm font-bold text-blue-300">${game.awayTeam.abbreviation}</span></div>`;
+                                    parent.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500/20 to-purple-500/20"><span class="text-xs font-bold text-blue-300">${game.awayTeam.abbreviation}</span></div>`;
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-semibold text-foreground truncate">
+                                {game.awayTeam.abbreviation}
+                              </div>
+                            </div>
+                          </div>
+                          <div className={`text-lg font-bold text-charcoal-200 transition-all duration-300 ml-2 ${
+                            awayAnimating ? 'scale-110 text-green-400 drop-shadow-lg' : ''
+                          }`}>
+                            {game.awayTeam.score}
+                          </div>
+                        </div>
+                        
+                        {/* Desktop: Full layout */}
+                        <div className="hidden sm:flex items-center justify-between flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 sm:space-x-3">
+                            {/* Team Logo */}
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden border border-border/30 bg-background/50 shrink-0">
+                              <img 
+                                src={getTeamLogoWithFallback(game.awayTeam.abbreviation)} 
+                                alt={`${game.awayTeam.name} logo`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const parent = target.parentElement;
+                                  if (parent) {
+                                    parent.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500/20 to-purple-500/20"><span class="text-xs sm:text-sm font-bold text-blue-300">${game.awayTeam.abbreviation}</span></div>`;
                                   }
                                 }}
                               />
                             </div>
                             <div className="min-w-0">
-                              <div className="text-sm font-semibold text-foreground truncate">
+                              <div className="text-xs sm:text-sm font-semibold text-foreground truncate">
                                 {game.awayTeam.name}
                               </div>
-                              <div className="text-xs text-muted-foreground">
+                              <div className="text-[10px] sm:text-xs text-muted-foreground hidden md:block">
                                 {game.awayTeam.abbreviation}
                               </div>
                             </div>
                           </div>
                           
                           {/* Away Score */}
-                          <div className={`text-2xl font-bold text-charcoal-200 transition-all duration-300 ml-6 ${
+                          <div className={`text-lg sm:text-xl md:text-2xl font-bold text-charcoal-200 transition-all duration-300 ml-4 sm:ml-6 ${
                             awayAnimating ? 'scale-110 text-green-400 drop-shadow-lg' : ''
                           }`}>
                             {game.awayTeam.score}
@@ -473,77 +525,118 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                         </div>
 
                         {/* Game Status Center */}
-                        <div className="flex flex-col items-center space-y-2 px-4">
-                          <div className={`px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r ${getStatusGradient(game.status, game.isLive)} border border-border/30`}>
+                        <div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center space-x-2 sm:space-y-2 sm:px-2 md:px-4 w-full sm:w-auto">
+                          <div className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-gradient-to-r ${getStatusGradient(game.status, game.isLive)} border border-border/30`}>
                             <span className={getStatusColor(game.status, game.isLive)}>
                               {getStatusText(game.status, game.period, game.clock)}
                             </span>
                           </div>
                           
-                          {/* Possession and Down/Distance */}
-                          {game.isLive && getPossessionText(game) && (
-                            <div className="px-2 py-1 bg-blue-500/20 rounded-full border border-blue-500/30">
-                              <span className="text-xs text-blue-400 font-medium">
-                                {getPossessionText(game)}
-                              </span>
-                            </div>
-                          )}
-                          
-                          {/* Field Position */}
-                          {game.isLive && getFieldPositionText(game) && (
-                            <div className="px-2 py-1 bg-orange-500/20 rounded-full border border-orange-500/30">
-                              <span className="text-xs text-orange-400 font-medium">
-                                {getFieldPositionText(game)}
-                              </span>
-                            </div>
-                          )}
-                          
-                          {/* Live Indicator */}
+                          {/* Mobile: Live indicator next to status */}
                           {game.isLive && (
-                            <div className="flex items-center space-x-1 px-2 py-1 bg-green-500/20 rounded-full border border-green-500/30">
-                              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                              <span className="text-xs text-green-400 font-medium">LIVE</span>
+                            <div className="flex items-center space-x-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-500/20 rounded-full border border-green-500/30 sm:hidden">
+                              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full animate-pulse"></div>
+                              <span className="text-[10px] sm:text-xs text-green-400 font-medium">LIVE</span>
                             </div>
                           )}
                           
-                          {/* Venue */}
-                          <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                            <MapPin className="h-3 w-3" />
-                            <span className="truncate max-w-32">{game.venue}</span>
+                          {/* Desktop: Full status info */}
+                          <div className="hidden sm:contents">
+                            {/* Possession and Down/Distance */}
+                            {game.isLive && getPossessionText(game) && (
+                              <div className="px-2 py-1 bg-blue-500/20 rounded-full border border-blue-500/30">
+                                <span className="text-[10px] sm:text-xs text-blue-400 font-medium truncate max-w-[120px]">
+                                  {getPossessionText(game)}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Field Position */}
+                            {game.isLive && getFieldPositionText(game) && (
+                              <div className="px-2 py-1 bg-orange-500/20 rounded-full border border-orange-500/30">
+                                <span className="text-[10px] sm:text-xs text-orange-400 font-medium">
+                                  {getFieldPositionText(game)}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Live Indicator */}
+                            {game.isLive && (
+                              <div className="flex items-center space-x-1 px-2 py-1 bg-green-500/20 rounded-full border border-green-500/30">
+                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                <span className="text-[10px] sm:text-xs text-green-400 font-medium">LIVE</span>
+                              </div>
+                            )}
+                            
+                            {/* Venue */}
+                            <div className="hidden md:flex items-center space-x-1 text-xs text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate max-w-32">{game.venue}</span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Home Team */}
-                        <div className="flex items-center justify-between flex-1 min-w-0">
-                          {/* Home Score */}
-                          <div className={`text-2xl font-bold text-charcoal-200 transition-all duration-300 mr-6 ${
-                            homeAnimating ? 'scale-110 text-green-400 drop-shadow-lg' : ''
-                          }`}>
-                            {game.homeTeam.score}
-                          </div>
-                          
-                          <div className="flex items-center space-x-3">
-                            <div className="min-w-0 text-right">
-                              <div className="text-sm font-semibold text-foreground truncate">
-                                {game.homeTeam.name}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {game.homeTeam.abbreviation}
-                              </div>
-                            </div>
-                            {/* Team Logo */}
-                            <div className="w-10 h-10 rounded-full overflow-hidden border border-border/30 bg-background/50">
+                        {/* Mobile: Home team on separate row */}
+                        <div className="flex items-center justify-between w-full sm:hidden">
+                          <div className="flex items-center space-x-2 flex-1 min-w-0">
+                            <div className="w-8 h-8 rounded-full overflow-hidden border border-border/30 bg-background/50 shrink-0">
                               <img 
                                 src={getTeamLogoWithFallback(game.homeTeam.abbreviation)} 
                                 alt={`${game.homeTeam.name} logo`}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  // Fallback to abbreviation if logo fails to load
                                   const target = e.target as HTMLImageElement;
                                   target.style.display = 'none';
                                   const parent = target.parentElement;
                                   if (parent) {
-                                    parent.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-500/20 to-blue-500/20"><span class="text-sm font-bold text-emerald-300">${game.homeTeam.abbreviation}</span></div>`;
+                                    parent.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-500/20 to-blue-500/20"><span class="text-xs font-bold text-emerald-300">${game.homeTeam.abbreviation}</span></div>`;
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-semibold text-foreground truncate">
+                                {game.homeTeam.abbreviation}
+                              </div>
+                            </div>
+                          </div>
+                          <div className={`text-lg font-bold text-charcoal-200 transition-all duration-300 ml-2 ${
+                            homeAnimating ? 'scale-110 text-green-400 drop-shadow-lg' : ''
+                          }`}>
+                            {game.homeTeam.score}
+                          </div>
+                        </div>
+
+                        {/* Desktop: Home Team */}
+                        <div className="hidden sm:flex items-center justify-between flex-1 min-w-0">
+                          {/* Home Score */}
+                          <div className={`text-lg sm:text-xl md:text-2xl font-bold text-charcoal-200 transition-all duration-300 mr-4 sm:mr-6 ${
+                            homeAnimating ? 'scale-110 text-green-400 drop-shadow-lg' : ''
+                          }`}>
+                            {game.homeTeam.score}
+                          </div>
+                          
+                          <div className="flex items-center space-x-2 sm:space-x-3">
+                            <div className="min-w-0 text-right">
+                              <div className="text-xs sm:text-sm font-semibold text-foreground truncate">
+                                {game.homeTeam.name}
+                              </div>
+                              <div className="text-[10px] sm:text-xs text-muted-foreground hidden md:block">
+                                {game.homeTeam.abbreviation}
+                              </div>
+                            </div>
+                            {/* Team Logo */}
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden border border-border/30 bg-background/50 shrink-0">
+                              <img 
+                                src={getTeamLogoWithFallback(game.homeTeam.abbreviation)} 
+                                alt={`${game.homeTeam.name} logo`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const parent = target.parentElement;
+                                  if (parent) {
+                                    parent.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-500/20 to-blue-500/20"><span class="text-xs sm:text-sm font-bold text-emerald-300">${game.homeTeam.abbreviation}</span></div>`;
                                   }
                                 }}
                               />
@@ -556,51 +649,51 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                           size="sm"
                           variant="ghost"
                           onClick={() => toggleGameExpansion(game.eventId)}
-                          className="ml-4 hover:bg-background/20 transition-all duration-200"
+                          className="sm:ml-4 hover:bg-background/20 transition-all duration-200 shrink-0 p-1.5 sm:p-2 absolute top-2 right-2 sm:relative sm:top-auto sm:right-auto"
                         >
                           {isExpanded ? (
-                            <ChevronUp className="h-4 w-4" />
+                            <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" />
                           ) : (
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
                           )}
                         </Button>
                       </div>
 
                       {/* Expanded Game Details */}
                       {isExpanded && (
-                        <div className="mt-4 pt-4 border-t border-border/20 animate-in slide-in-from-top-2 duration-300">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                              <Calendar className="h-4 w-4" />
+                        <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-border/20 animate-in slide-in-from-top-2 duration-300">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 md:gap-4 mb-3 sm:mb-4">
+                            <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm text-muted-foreground">
+                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                               <span>Week {game.week} • {game.season}</span>
                             </div>
-                            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                              <Trophy className="h-4 w-4" />
-                              <span>Event ID: {game.eventId}</span>
+                            <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm text-muted-foreground">
+                              <Trophy className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                              <span className="truncate">Event ID: {game.eventId}</span>
                             </div>
-                            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                              <Play className="h-4 w-4" />
-                              <span>Status: {game.status}</span>
+                            <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm text-muted-foreground sm:col-span-2 md:col-span-1">
+                              <Play className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                              <span className="truncate">Status: {game.status}</span>
                             </div>
                           </div>
                           
                           {/* Top Fantasy Scorers */}
-                          <div className="mt-4 space-y-3">
-                            <h4 className="text-sm font-semibold text-foreground flex items-center space-x-2">
-                              <Trophy className="h-4 w-4 text-yellow-500" />
+                          <div className="mt-2 sm:mt-4 space-y-2 sm:space-y-3">
+                            <h4 className="text-xs sm:text-sm font-semibold text-foreground flex items-center space-x-1.5 sm:space-x-2">
+                              <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 shrink-0" />
                               <span>Top Fantasy Scorers</span>
                             </h4>
                             
                             {loadingScorers.has(game.eventId) && (
-                              <div className="flex items-center justify-center py-6">
-                                <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
-                                <span className="text-sm text-muted-foreground">Loading top scorers...</span>
+                              <div className="flex items-center justify-center py-4 sm:py-6">
+                                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin text-muted-foreground mr-2" />
+                                <span className="text-xs sm:text-sm text-muted-foreground">Loading top scorers...</span>
                               </div>
                             )}
                             
                             {!loadingScorers.has(game.eventId) && topScorers.has(game.eventId) && 
                              (!topScorers.get(game.eventId)?.homePlayers?.length && !topScorers.get(game.eventId)?.awayPlayers?.length) && (
-                              <div className="text-center py-4 text-sm text-muted-foreground">
+                              <div className="text-center py-3 sm:py-4 text-xs sm:text-sm text-muted-foreground">
                                 No scorer data available yet
                               </div>
                             )}
@@ -610,7 +703,7 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                               return !loadingScorers.has(game.eventId) && topScorers.has(game.eventId) && scorers &&
                                ((scorers.homePlayers?.length ?? 0) > 0 || (scorers.awayPlayers?.length ?? 0) > 0)
                             })() && (
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
                                 {/* Away Team Top Scorers - Left Column */}
                                 {game.awayTeam && topScorers.get(game.eventId)?.awayPlayers && (
                                   <div>
@@ -733,21 +826,21 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
 
         {/* Footer */}
         {games.length > 0 && (
-          <div className="px-4 py-3 bg-gradient-to-r from-charcoal-900/30 via-slate-900/30 to-zinc-900/30 border-t border-border/20">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <div className="flex items-center space-x-4">
+          <div className="px-2 sm:px-3 md:px-4 py-2 sm:py-3 bg-gradient-to-r from-charcoal-900/30 via-slate-900/30 to-zinc-900/30 border-t border-border/20">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 text-[10px] sm:text-xs text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 md:space-x-4">
                 <span className="flex items-center space-x-1">
-                  <Trophy className="h-3 w-3" />
+                  <Trophy className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
                   <span>{games.length} live game{games.length !== 1 ? 's' : ''}</span>
                 </span>
-                <span className="flex items-center space-x-1">
-                  <RefreshCw className="h-3 w-3" />
+                <span className="hidden sm:flex items-center space-x-1">
+                  <RefreshCw className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
                   <span>{isPollingActive ? 'Auto-refresh every 30s' : 'Manual refresh only'}</span>
                 </span>
               </div>
               <div className="flex items-center space-x-1">
-                <div className={`w-2 h-2 rounded-full ${isPollingActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
-                <span>{isPollingActive ? 'Live updates active' : 'Live updates paused'}</span>
+                <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${isPollingActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+                <span className="truncate">{isPollingActive ? 'Live updates active' : 'Live updates paused'}</span>
               </div>
             </div>
           </div>

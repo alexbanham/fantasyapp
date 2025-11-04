@@ -202,10 +202,10 @@ const Transactions: React.FC<TransactionsProps> = ({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
       {/* Header with filters and controls */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-        <div className="flex-1 flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+      <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-start lg:items-center justify-between">
+        <div className="flex-1 flex flex-col sm:flex-row gap-2 sm:gap-3 w-full lg:w-auto min-w-0">
           <div className="relative flex-1 sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -480,31 +480,31 @@ const Transactions: React.FC<TransactionsProps> = ({
                   return (
                     <div
                       key={tx.id}
-                      className="border rounded-lg p-4 hover:bg-secondary/50 transition-colors"
+                      className="border rounded-lg p-3 sm:p-4 hover:bg-secondary/50 transition-colors overflow-hidden"
                     >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${typeInfo.color}`}>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+                        <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                          <div className={`p-2 rounded-lg shrink-0 ${typeInfo.color}`}>
                             <typeInfo.icon className="h-4 w-4" />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{typeInfo.label}</span>
-                              {getStatusBadge(tx.status)}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-sm sm:text-base truncate">{typeInfo.label}</span>
+                              <div className="shrink-0">{getStatusBadge(tx.status)}</div>
                             </div>
-                            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                              <Calendar className="h-3 w-3" />
-                              {date.toLocaleDateString()} {date.toLocaleTimeString()}
-                              <span className="mx-1">•</span>
-                              Week {tx.scoringPeriodId}
+                            <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
+                              <Calendar className="h-3 w-3 shrink-0" />
+                              <span className="whitespace-nowrap">{date.toLocaleDateString()} {date.toLocaleTimeString()}</span>
+                              <span className="mx-0.5 sm:mx-1 shrink-0">•</span>
+                              <span className="whitespace-nowrap">Week {tx.scoringPeriodId}</span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                           {tx.teamLogo && (
-                            <img src={tx.teamLogo} alt={tx.teamName} className="h-8 w-8 rounded" />
+                            <img src={tx.teamLogo} alt={tx.teamName} className="h-8 w-8 rounded shrink-0" />
                           )}
-                          <span className="font-medium">{tx.teamName}</span>
+                          <span className="font-medium text-sm sm:text-base truncate max-w-[150px] sm:max-w-none">{tx.teamName}</span>
                         </div>
                       </div>
 
@@ -543,7 +543,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                             const teams = Array.from(teamGroups.values());
                             
                             return (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 relative min-w-0">
                                 {/* Visual connector for trades */}
                                 {teams.length === 2 && (
                                   <div className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-px h-full bg-primary/20 -z-10" />
@@ -551,23 +551,23 @@ const Transactions: React.FC<TransactionsProps> = ({
                                 {teams.map((teamGroup, teamIdx) => {
                                   const team = teamGroup.team;
                                   return (
-                                    <Card key={team.id} className={`p-4 border-2 ${teamIdx === 0 ? 'border-blue-500/30' : 'border-green-500/30'}`}>
-                                      <div className="flex items-center gap-3 mb-4 pb-3 border-b">
+                                    <Card key={team.id} className={`p-3 sm:p-4 border-2 overflow-hidden ${teamIdx === 0 ? 'border-blue-500/30' : 'border-green-500/30'}`}>
+                                      <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 pb-2 sm:pb-3 border-b">
                                         {team.logo && (
-                                          <img src={team.logo} alt={team.name} className="h-10 w-10 rounded" />
+                                          <img src={team.logo} alt={team.name} className="h-8 w-8 sm:h-10 sm:w-10 rounded shrink-0" />
                                         )}
-                                        <div className="flex-1">
-                                          <h4 className="font-semibold text-base">{team.name}</h4>
-                                          <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="font-semibold text-sm sm:text-base truncate">{team.name}</h4>
+                                          <div className="flex gap-2 sm:gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
                                             {teamGroup.sending.length > 0 && (
-                                              <span className="flex items-center gap-1">
-                                                <TrendingDown className="h-3 w-3 text-red-500" />
+                                              <span className="flex items-center gap-1 whitespace-nowrap">
+                                                <TrendingDown className="h-3 w-3 text-red-500 shrink-0" />
                                                 Sending: {teamGroup.sending.length}
                                               </span>
                                             )}
                                             {teamGroup.receiving.length > 0 && (
-                                              <span className="flex items-center gap-1">
-                                                <TrendingUp className="h-3 w-3 text-green-500" />
+                                              <span className="flex items-center gap-1 whitespace-nowrap">
+                                                <TrendingUp className="h-3 w-3 text-green-500 shrink-0" />
                                                 Receiving: {teamGroup.receiving.length}
                                               </span>
                                             )}
@@ -584,22 +584,22 @@ const Transactions: React.FC<TransactionsProps> = ({
                                           </div>
                                           <div className="space-y-2">
                                             {teamGroup.sending.map((item, idx) => (
-                                              <div key={idx} className="flex items-center gap-2 p-2 bg-red-500/5 rounded border border-red-500/20">
+                                              <div key={idx} className="flex items-center gap-2 p-2 bg-red-500/5 rounded border border-red-500/20 min-w-0">
                                                 {item.playerHeadshot ? (
                                                   <img 
                                                     src={item.playerHeadshot} 
                                                     alt={item.playerName}
-                                                    className="w-8 h-8 rounded-full object-cover"
+                                                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover shrink-0"
                                                   />
                                                 ) : (
-                                                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                                                    <Users className="h-4 w-4 text-muted-foreground" />
+                                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                                    <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                                                   </div>
                                                 )}
                                                 <div className="flex-1 min-w-0">
-                                                  <div className="font-medium text-sm">{item.playerName}</div>
+                                                  <div className="font-medium text-xs sm:text-sm truncate">{item.playerName || 'Unknown Player'}</div>
                                                   {item.playerPosition && (
-                                                    <div className="text-xs text-muted-foreground">{item.playerPosition}</div>
+                                                    <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{item.playerPosition}</div>
                                                   )}
                                                 </div>
                                               </div>
@@ -617,22 +617,22 @@ const Transactions: React.FC<TransactionsProps> = ({
                                           </div>
                                           <div className="space-y-2">
                                             {teamGroup.receiving.map((item, idx) => (
-                                              <div key={idx} className="flex items-center gap-2 p-2 bg-green-500/5 rounded border border-green-500/20">
+                                              <div key={idx} className="flex items-center gap-2 p-2 bg-green-500/5 rounded border border-green-500/20 min-w-0">
                                                 {item.playerHeadshot ? (
                                                   <img 
                                                     src={item.playerHeadshot} 
                                                     alt={item.playerName}
-                                                    className="w-8 h-8 rounded-full object-cover"
+                                                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover shrink-0"
                                                   />
                                                 ) : (
-                                                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                                                    <Users className="h-4 w-4 text-muted-foreground" />
+                                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                                    <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                                                   </div>
                                                 )}
                                                 <div className="flex-1 min-w-0">
-                                                  <div className="font-medium text-sm">{item.playerName}</div>
+                                                  <div className="font-medium text-xs sm:text-sm truncate">{item.playerName || 'Unknown Player'}</div>
                                                   {item.playerPosition && (
-                                                    <div className="text-xs text-muted-foreground">{item.playerPosition}</div>
+                                                    <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{item.playerPosition}</div>
                                                   )}
                                                 </div>
                                               </div>
@@ -656,15 +656,15 @@ const Transactions: React.FC<TransactionsProps> = ({
                               </div>
                               <div className="space-y-2">
                                 {tx.items.filter(item => item.type !== 'TRADE').slice(0, 5).map((item, idx) => (
-                                  <div key={idx} className="flex items-center gap-2 p-2 bg-secondary/30 rounded text-sm">
+                                  <div key={idx} className="flex items-center gap-2 p-2 bg-secondary/30 rounded text-xs sm:text-sm min-w-0">
                                     {item.playerHeadshot && (
-                                      <img src={item.playerHeadshot} alt={item.playerName} className="w-6 h-6 rounded-full" />
+                                      <img src={item.playerHeadshot} alt={item.playerName} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full shrink-0" />
                                     )}
-                                    <span className="font-medium">{item.playerName}</span>
-                                    <Badge variant="outline" className="text-xs">
+                                    <span className="font-medium truncate flex-1 min-w-0">{item.playerName || 'Unknown Player'}</span>
+                                    <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0">
                                       {item.type}
                                     </Badge>
-                                    <span className="text-xs text-muted-foreground">{item.action}</span>
+                                    <span className="text-[10px] sm:text-xs text-muted-foreground truncate max-w-[80px] sm:max-w-none">{item.action}</span>
                                   </div>
                                 ))}
                                 {tx.items.filter(item => item.type !== 'TRADE').length > 5 && (
@@ -684,11 +684,11 @@ const Transactions: React.FC<TransactionsProps> = ({
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {tx.participatingTeams.map((team) => (
-                              <div key={team.id} className="flex items-center gap-2 px-2 py-1 bg-secondary rounded">
+                              <div key={team.id} className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 bg-secondary rounded min-w-0">
                                 {team.logo && (
-                                  <img src={team.logo} alt={team.name} className="h-5 w-5 rounded" />
+                                  <img src={team.logo} alt={team.name} className="h-4 w-4 sm:h-5 sm:w-5 rounded shrink-0" />
                                 )}
-                                <span className="text-sm">{team.name}</span>
+                                <span className="text-xs sm:text-sm truncate">{team.name}</span>
                               </div>
                             ))}
                           </div>
@@ -698,35 +698,35 @@ const Transactions: React.FC<TransactionsProps> = ({
                       {/* Transaction items (non-trade items or all items if not a trade) */}
                       {tx.items && tx.items.length > 0 && !(tx.type === 'TRADE_PROPOSAL' || tx.items?.some(item => item.type === 'TRADE')) && (
                         <div className="mt-3 pt-3 border-t">
-                          <div className="flex items-center justify-between mb-3">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 mb-3">
                             <div className="flex items-center gap-2">
-                              <Activity className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm font-medium">
+                              <Activity className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="text-xs sm:text-sm font-medium">
                                 {tx.items.length} {tx.items.length === 1 ? 'Player' : 'Players'} Involved
                               </span>
                             </div>
                             {/* Transaction summary by type */}
-                            <div className="flex gap-2 text-xs">
+                            <div className="flex gap-1.5 sm:gap-2 text-xs flex-wrap">
                               {tx.items.filter(item => item.type === 'ADD').length > 0 && (
-                                <Badge variant="outline" className="border-green-500/20 text-green-600 dark:text-green-400">
+                                <Badge variant="outline" className="border-green-500/20 text-green-600 dark:text-green-400 shrink-0">
                                   <Plus className="h-3 w-3 mr-1" />
                                   {tx.items.filter(item => item.type === 'ADD').length}
                                 </Badge>
                               )}
                               {tx.items.filter(item => item.type === 'DROP').length > 0 && (
-                                <Badge variant="outline" className="border-red-500/20 text-red-600 dark:text-red-400">
+                                <Badge variant="outline" className="border-red-500/20 text-red-600 dark:text-red-400 shrink-0">
                                   <Minus className="h-3 w-3 mr-1" />
                                   {tx.items.filter(item => item.type === 'DROP').length}
                                 </Badge>
                               )}
                               {tx.items.filter(item => item.type === 'TRADE').length > 0 && (
-                                <Badge variant="outline" className="border-blue-500/20 text-blue-600 dark:text-blue-400">
+                                <Badge variant="outline" className="border-blue-500/20 text-blue-600 dark:text-blue-400 shrink-0">
                                   <ArrowLeftRight className="h-3 w-3 mr-1" />
                                   {tx.items.filter(item => item.type === 'TRADE').length}
                                 </Badge>
                               )}
                               {tx.items.filter(item => item.type === 'LINEUP').length > 0 && (
-                                <Badge variant="outline" className="border-purple-500/20 text-purple-600 dark:text-purple-400">
+                                <Badge variant="outline" className="border-purple-500/20 text-purple-600 dark:text-purple-400 shrink-0">
                                   <Move className="h-3 w-3 mr-1" />
                                   {tx.items.filter(item => item.type === 'LINEUP').length}
                                 </Badge>
@@ -735,32 +735,32 @@ const Transactions: React.FC<TransactionsProps> = ({
                           </div>
                           <div className="space-y-2">
                             {tx.items.slice(0, 10).map((item, idx) => (
-                              <div key={idx} className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg border border-border/50">
+                              <div key={idx} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-secondary/50 rounded-lg border border-border/50 min-w-0">
                                 {/* Player Avatar */}
                                 {item.playerHeadshot ? (
                                   <img 
                                     src={item.playerHeadshot} 
                                     alt={item.playerName}
-                                    className="w-10 h-10 rounded-full object-cover border-2 border-border"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-border shrink-0"
                                   />
                                 ) : (
-                                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center border-2 border-border">
-                                    <Users className="h-5 w-5 text-muted-foreground" />
+                                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-muted flex items-center justify-center border-2 border-border shrink-0">
+                                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                                   </div>
                                 )}
                                 
                                 {/* Player Info */}
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-sm">{item.playerName}</span>
+                                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                    <span className="font-semibold text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">{item.playerName || 'Unknown Player'}</span>
                                     {item.playerPosition && (
-                                      <Badge variant="outline" className="text-xs">
+                                      <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0">
                                         {item.playerPosition}
                                       </Badge>
                                     )}
                                     <Badge 
                                       variant="outline" 
-                                      className={`text-xs ${
+                                      className={`text-[10px] sm:text-xs shrink-0 ${
                                         item.type === 'ADD' ? 'border-green-500/20 text-green-600 dark:text-green-400' :
                                         item.type === 'DROP' ? 'border-red-500/20 text-red-600 dark:text-red-400' :
                                         item.type === 'TRADE' ? 'border-blue-500/20 text-blue-600 dark:text-blue-400' :
@@ -771,15 +771,15 @@ const Transactions: React.FC<TransactionsProps> = ({
                                       {item.type}
                                     </Badge>
                                   </div>
-                                  <div className="text-sm text-muted-foreground mt-1">
+                                  <div className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
                                     {item.action}
                                   </div>
                                   {/* Team movement for trades */}
                                   {item.type === 'TRADE' && item.fromTeamName && item.toTeamName && (
-                                    <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                      <span>{item.fromTeamName}</span>
-                                      <ArrowLeftRight className="h-3 w-3" />
-                                      <span>{item.toTeamName}</span>
+                                    <div className="text-[10px] sm:text-xs text-muted-foreground mt-1 flex items-center gap-1 flex-wrap">
+                                      <span className="truncate">{item.fromTeamName}</span>
+                                      <ArrowLeftRight className="h-3 w-3 shrink-0" />
+                                      <span className="truncate">{item.toTeamName}</span>
                                     </div>
                                   )}
                                 </div>

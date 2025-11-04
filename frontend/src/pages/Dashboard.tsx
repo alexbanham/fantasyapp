@@ -149,23 +149,23 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 md:py-8">
         {/* NFL Week Display */}
         <NFLWeekDisplay config={config} />
 
         {/* Main Content */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
             
             {/* Live Games */}
             <LiveScoreStrip 
-              className="mb-6" 
+              className="mb-4 sm:mb-6" 
               isPollingActive={pollingStatus.isPolling}
               onLiveGamesRefresh={syncCurrentWeekPlayers}
             />
 
             {/* Highlights - Show when no live games (and not actively checking) */}
             {!checkingLiveGames && !hasLiveGames && (
-              <div className="mb-6">
+              <div className="mb-4 sm:mb-6">
                 <GameHighlights 
                   week={config?.currentWeek} 
                   season={config?.currentSeason} 
@@ -174,15 +174,15 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
             )}
 
             {/* Fantasy Matchups */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  <h2 className="text-2xl font-bold text-foreground">
+            <div className="mb-4 sm:mb-6">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <div className="flex items-center space-x-2 min-w-0 flex-1">
+                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground truncate">
                     Week {config?.currentWeek || 'N/A'} Matchups
                   </h2>
                   {loadingMatchups && (
-                    <Badge variant="secondary" className="ml-2">Loading...</Badge>
+                    <Badge variant="secondary" className="ml-2 shrink-0 text-xs">Loading...</Badge>
                   )}
                 </div>
               </div>
@@ -205,7 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {matchups.map((matchup) => {
                     const detailed = getDetailedMatchup(matchup)
                     const hasDetailed = !!detailed
@@ -253,47 +253,47 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
                       <Card
                         key={matchup.matchupId}
                         className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-primary/10 hover:border-primary/30 ${
-                          hasDetailed ? 'hover:scale-[1.02]' : 'opacity-75'
+                          hasDetailed ? 'hover:scale-[1.02] active:scale-[0.98]' : 'opacity-75'
                         }`}
                         onClick={() => hasDetailed && handleMatchupClick(matchup.matchupId)}
                       >
-                        <CardContent className="p-5">
+                        <CardContent className="p-3 sm:p-4 md:p-5">
                           {/* Status Badge */}
-                          <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center justify-between mb-3 sm:mb-4">
                             <Badge 
                               variant={
                                 matchup.status === 'FINAL' ? 'default' :
                                 matchup.status === 'IN_PROGRESS' ? 'secondary' :
                                 'outline'
                               }
-                              className="text-xs"
+                              className="text-[10px] sm:text-xs"
                             >
                               {matchup.status.replace('_', ' ')}
                             </Badge>
                             {matchup.isPlayoff && (
-                              <Badge variant="destructive" className="text-xs">Playoff</Badge>
+                              <Badge variant="destructive" className="text-[10px] sm:text-xs">Playoff</Badge>
                             )}
                           </div>
 
                           {/* Teams */}
-                          <div className="space-y-3">
+                          <div className="space-y-2 sm:space-y-3">
                             {/* Away Team */}
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                              <div className="flex items-center space-x-1.5 sm:space-x-2 flex-1 min-w-0">
                                 {matchup.awayTeam.logo && (
                                   <img
                                     src={matchup.awayTeam.logo}
                                     alt={matchup.awayTeam.teamName}
-                                    className="w-8 h-8 rounded-full object-cover shrink-0"
+                                    className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full object-cover shrink-0"
                                   />
                                 )}
                                 <div className="flex-1 min-w-0">
-                                  <span className="font-semibold text-sm truncate block">
+                                  <span className="font-semibold text-xs sm:text-sm truncate block">
                                     {matchup.awayTeam.teamName}
                                   </span>
                                   <Badge 
                                     variant="outline"
-                                    className={`text-[10px] px-1.5 py-0 ${
+                                    className={`text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0 mt-0.5 ${
                                       awayWinProb >= 70 
                                         ? 'bg-green-500/10 text-green-400 border-green-500/20' 
                                         : awayWinProb >= 50
@@ -308,11 +308,11 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
                                 </div>
                               </div>
                               <div className="text-right shrink-0 ml-2">
-                                <div className="text-xl font-bold">
+                                <div className="text-lg sm:text-xl font-bold">
                                   {matchup.awayTeam.score?.toFixed(1) || '0.0'}
                                 </div>
                                 {matchup.awayTeam.projectedScore > 0 && (
-                                  <div className="text-xs text-muted-foreground">
+                                  <div className="text-[10px] sm:text-xs text-muted-foreground">
                                     Proj: {matchup.awayTeam.projectedScore.toFixed(1)}
                                   </div>
                                 )}
@@ -320,29 +320,29 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
                             </div>
 
                             {/* VS Divider */}
-                            <div className="flex items-center justify-center py-1">
+                            <div className="flex items-center justify-center py-0.5 sm:py-1">
                               <div className="w-full h-px bg-border/30" />
-                              <span className="px-2 text-xs text-muted-foreground">VS</span>
+                              <span className="px-1.5 sm:px-2 text-[10px] sm:text-xs text-muted-foreground">VS</span>
                               <div className="w-full h-px bg-border/30" />
                             </div>
 
                             {/* Home Team */}
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                              <div className="flex items-center space-x-1.5 sm:space-x-2 flex-1 min-w-0">
                                 {matchup.homeTeam.logo && (
                                   <img
                                     src={matchup.homeTeam.logo}
                                     alt={matchup.homeTeam.teamName}
-                                    className="w-8 h-8 rounded-full object-cover shrink-0"
+                                    className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full object-cover shrink-0"
                                   />
                                 )}
                                 <div className="flex-1 min-w-0">
-                                  <span className="font-semibold text-sm truncate block">
+                                  <span className="font-semibold text-xs sm:text-sm truncate block">
                                     {matchup.homeTeam.teamName}
                                   </span>
                                   <Badge 
                                     variant="outline"
-                                    className={`text-[10px] px-1.5 py-0 ${
+                                    className={`text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0 mt-0.5 ${
                                       homeWinProb >= 70 
                                         ? 'bg-green-500/10 text-green-400 border-green-500/20' 
                                         : homeWinProb >= 50
@@ -357,11 +357,11 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
                                 </div>
                               </div>
                               <div className="text-right shrink-0 ml-2">
-                                <div className="text-xl font-bold">
+                                <div className="text-lg sm:text-xl font-bold">
                                   {matchup.homeTeam.score?.toFixed(1) || '0.0'}
                                 </div>
                                 {matchup.homeTeam.projectedScore > 0 && (
-                                  <div className="text-xs text-muted-foreground">
+                                  <div className="text-[10px] sm:text-xs text-muted-foreground">
                                     Proj: {matchup.homeTeam.projectedScore.toFixed(1)}
                                   </div>
                                 )}
@@ -371,9 +371,9 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
 
                           {/* Click hint */}
                           {hasDetailed && (
-                            <div className="mt-4 pt-4 border-t border-border/20">
-                              <div className="text-xs text-center text-muted-foreground">
-                                Click to view detailed rosters
+                            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/20">
+                              <div className="text-[10px] sm:text-xs text-center text-muted-foreground">
+                                Tap to view detailed rosters
                               </div>
                             </div>
                           )}

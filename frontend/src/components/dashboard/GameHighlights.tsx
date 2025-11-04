@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent } from '../ui/card'
-import { Trophy, TrendingUp, Zap, Flame, Users, Target } from 'lucide-react'
+import { Trophy, TrendingUp, Zap, Flame, Users, Target, RefreshCw } from 'lucide-react'
 import { getTeamLogoWithFallback } from '../../lib/teamLogos'
 import { getGameHighlights } from '../../services/api'
 
@@ -107,17 +107,36 @@ interface GameHighlightsProps {
 const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, season }) => {
   const [highlights, setHighlights] = useState<Highlight | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const hasLoadedOnceRef = React.useRef(false)
+  const previousWeekRef = React.useRef<number | undefined>(undefined)
+  const previousSeasonRef = React.useRef<number | undefined>(undefined)
 
   useEffect(() => {
     const fetchHighlights = async () => {
-      try {
+      // Only show loading spinner on initial load or when week/season changes
+      const isWeekSeasonChange = week !== previousWeekRef.current || season !== previousSeasonRef.current
+      const isInitialLoad = !hasLoadedOnceRef.current || isWeekSeasonChange
+      
+      if (isInitialLoad) {
         setIsLoading(true)
+        previousWeekRef.current = week
+        previousSeasonRef.current = season
+      } else if (hasLoadedOnceRef.current) {
+        // For subsequent updates (polling), use a subtle refreshing indicator
+        setIsRefreshing(true)
+      }
+      
+      try {
         const response = await getGameHighlights(week, season)
         
         if (response.success) {
           setHighlights(response)
           setError(null)
+          setHasLoadedOnce(true)
+          hasLoadedOnceRef.current = true
         } else {
           setError(response.error || 'Failed to fetch highlights')
         }
@@ -125,13 +144,15 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, s
         setError('Failed to load game highlights')
       } finally {
         setIsLoading(false)
+        setIsRefreshing(false)
       }
     }
 
     fetchHighlights()
   }, [week, season])
 
-  if (isLoading) {
+  // Only show loading spinner if we don't have data yet (initial load)
+  if (isLoading && !highlights) {
     return (
       <Card className={`glass border-border/30 ${className}`}>
         <CardContent className="p-6">
@@ -162,23 +183,31 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, s
       <div className="relative bg-gradient-to-r from-charcoal-900/50 via-slate-900/50 to-zinc-900/50 border-b border-border/20">
         <div className="absolute inset-0 bg-gradient-to-r from-yellow-600/5 via-orange-600/5 to-red-600/5"></div>
         <div className="relative p-4">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-500/20 to-orange-500/20">
-              <Trophy className="h-5 w-5 text-yellow-400" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-500/20 to-orange-500/20">
+                <Trophy className="h-5 w-5 text-yellow-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold bg-gradient-to-r from-charcoal-200 via-slate-200 to-zinc-200 bg-clip-text text-transparent">
+                  Game Highlights
+                </h3>
+                <p className="text-xs text-muted-foreground">Week {highlights.week} • Top performers & notable games</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-bold bg-gradient-to-r from-charcoal-200 via-slate-200 to-zinc-200 bg-clip-text text-transparent">
-                Game Highlights
-              </h3>
-              <p className="text-xs text-muted-foreground">Week {highlights.week} • Top performers & notable games</p>
-            </div>
+            {isRefreshing && (
+              <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                <span className="hidden sm:inline">Updating...</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <CardContent className="p-4">
+      <CardContent className="p-2 sm:p-3 md:p-4">
         {/* Compact Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {/* Column 1: Top Scorers and Projections */}
           <div className="space-y-4">
             {/* Top Fantasy Scorers */}
