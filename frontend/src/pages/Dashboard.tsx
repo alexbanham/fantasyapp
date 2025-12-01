@@ -9,6 +9,7 @@ import {
   useSyncOperations, 
   useConfig
 } from '../hooks/useDashboard'
+import { ConfigState } from '../types/dashboard'
 import { getLiveGamesOnly, getLeagueOverview, getLeagueBoxscores, syncRosteredPlayersCurrentWeek, LeagueMatchup, DetailedMatchup } from '../services/api'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
@@ -16,9 +17,9 @@ import { getCache, setCache } from '../lib/cache'
 
 const Dashboard: React.FC = () => {
   // Custom hooks - only for dashboard-specific functionality
-  const { pollingStatus } = usePollingStatus()
-  const { syncCurrentWeekPlayers } = useSyncOperations()
-  const { config } = useConfig()
+  const { pollingStatus, togglePollingConfig } = usePollingStatus()
+  const { syncCurrentWeekPlayers, syncFantasyNewsData } = useSyncOperations()
+  const { config, fetchConfig, configState, setConfigState } = useConfig()
   
   // Check if there are live games
   const [hasLiveGames, setHasLiveGames] = useState(false)

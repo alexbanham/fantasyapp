@@ -159,6 +159,16 @@ const Money = () => {
     return `${(prob * 100).toFixed(1)}%`
   }
 
+  // Calculate implied probability from American odds
+  const calculateImpliedProbability = (americanOdds: number | null | undefined): number | null => {
+    if (americanOdds === null || americanOdds === undefined) return null
+    if (americanOdds > 0) {
+      return 100 / (americanOdds + 100)
+    } else {
+      return Math.abs(americanOdds) / (Math.abs(americanOdds) + 100)
+    }
+  }
+
   const formatSpread = (points: number | undefined | null): string => {
     if (points === null || points === undefined) return 'N/A'
     return points > 0 ? `+${points}` : `${points}`
@@ -492,7 +502,7 @@ const Money = () => {
                               {calculateBetToWin100(gameOdds.bestOdds.moneyline.away.american)}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {formatProbability(gameOdds.bestOdds.moneyline.away.impliedProbability)} chance
+                              {formatProbability(calculateImpliedProbability(gameOdds.bestOdds.moneyline.away.american))} chance
                             </div>
                             {gameOdds.bestOdds.moneyline.away.source && (
                               <div className="text-xs text-muted-foreground mt-1">
@@ -532,7 +542,7 @@ const Money = () => {
                               {calculateBetToWin100(gameOdds.bestOdds.moneyline.home.american)}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {formatProbability(gameOdds.bestOdds.moneyline.home.impliedProbability)} chance
+                              {formatProbability(calculateImpliedProbability(gameOdds.bestOdds.moneyline.home.american))} chance
                             </div>
                             {gameOdds.bestOdds.moneyline.home.source && (
                               <div className="text-xs text-muted-foreground mt-1">
@@ -569,7 +579,9 @@ const Money = () => {
                         <div className="p-4 rounded-lg bg-accent/30 border border-border">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="text-sm font-semibold">Point Spread ⭐</div>
-                            <Info className="h-4 w-4 text-muted-foreground" title="The favorite must win by more than the spread. The underdog can lose by less than the spread." />
+                            <div title="The favorite must win by more than the spread. The underdog can lose by less than the spread.">
+                              <Info className="h-4 w-4 text-muted-foreground" />
+                            </div>
                           </div>
                         {gameOdds.bestOdds?.spread?.home && gameOdds.bestOdds?.spread?.away ? (
                           <div className="text-sm space-y-1">
@@ -595,7 +607,9 @@ const Money = () => {
                         <div className="p-4 rounded-lg bg-accent/30 border border-border">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="text-sm font-semibold">Total (Over/Under) ⭐</div>
-                            <Info className="h-4 w-4 text-muted-foreground" title="Bet on whether the combined score will be over or under this number." />
+                            <div title="Bet on whether the combined score will be over or under this number.">
+                              <Info className="h-4 w-4 text-muted-foreground" />
+                            </div>
                           </div>
                         {gameOdds.bestOdds?.total?.points ? (
                           <div className="text-sm space-y-1">
@@ -627,7 +641,9 @@ const Money = () => {
                               <BarChart3 className="h-4 w-4" />
                               Compare All Bookmakers ({gameOdds.sources.length})
                             </h4>
-                            <Info className="h-4 w-4 text-muted-foreground" title="Compare odds from different sportsbooks to find the best value. The star ⭐ indicates the best odds we found." />
+                            <div title="Compare odds from different sportsbooks to find the best value. The star ⭐ indicates the best odds we found.">
+                              <Info className="h-4 w-4 text-muted-foreground" />
+                            </div>
                           </div>
                           <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                             {/* Moneyline Comparison */}
@@ -761,7 +777,9 @@ const Money = () => {
                                 Bet on individual player performance. Compare odds across bookmakers to find the best value.
                               </p>
                             </div>
-                            <Info className="h-4 w-4 text-muted-foreground mt-1" title="Player props let you bet on specific player statistics like touchdowns, yards, and receptions. Each bookmaker may offer different odds, so compare to find the best value." />
+                            <div className="mt-1" title="Player props let you bet on specific player statistics like touchdowns, yards, and receptions. Each bookmaker may offer different odds, so compare to find the best value.">
+                              <Info className="h-4 w-4 text-muted-foreground" />
+                            </div>
                           </div>
 
                           {/* Group props by market type */}
