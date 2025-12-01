@@ -1026,4 +1026,191 @@ export const dataExportApi = {
   }
 }
 
+// Betting Odds API calls
+export interface BettingOddsSource {
+  source: string
+  lastUpdated: string
+  moneyline?: {
+    home?: {
+      american: number
+      decimal: number
+      impliedProbability: number
+    }
+    away?: {
+      american: number
+      decimal: number
+      impliedProbability: number
+    }
+  }
+  spread?: {
+    home?: {
+      points: number
+      odds: {
+        american: number
+        decimal: number
+      }
+    }
+    away?: {
+      points: number
+      odds: {
+        american: number
+        decimal: number
+      }
+    }
+  }
+  total?: {
+    points: number
+    over?: {
+      odds: {
+        american: number
+        decimal: number
+      }
+    }
+    under?: {
+      odds: {
+        american: number
+        decimal: number
+      }
+    }
+  }
+  playerProps?: Array<{
+    market: string
+    playerName: string
+    playerId?: string | null
+    outcomes: Array<{
+      name: string
+      price: number
+      point?: number | null
+    }>
+    lastUpdate: string
+  }>
+}
+
+export interface BettingOdds {
+  _id: string
+  gameId: string
+  eventId: string
+  week: number
+  season: number
+  homeTeam: {
+    abbreviation: string
+    name: string
+  }
+  awayTeam: {
+    abbreviation: string
+    name: string
+  }
+  gameDate: string
+  sources: BettingOddsSource[]
+  bestOdds?: {
+    moneyline?: {
+      home?: {
+        value: number
+        source: string
+        american: number
+        decimal: number
+      }
+      away?: {
+        value: number
+        source: string
+        american: number
+        decimal: number
+      }
+    }
+    spread?: {
+      home?: {
+        points: number
+        odds: {
+          american: number
+          source: string
+        }
+      }
+      away?: {
+        points: number
+        odds: {
+          american: number
+          source: string
+        }
+      }
+    }
+    total?: {
+      points: number
+      over?: {
+        odds: {
+          american: number
+          source: string
+        }
+      }
+      under?: {
+        odds: {
+          american: number
+          source: string
+        }
+      }
+    }
+  }
+  lastSynced: string
+  syncCount: number
+  isActive: boolean
+}
+
+export interface BettingOddsResponse {
+  success: boolean
+  week?: number
+  season?: number
+  odds: BettingOdds[]
+  count?: number
+}
+
+export const getBettingOddsByWeek = async (week: number, season?: number): Promise<BettingOddsResponse> => {
+  const params = new URLSearchParams()
+  params.append('week', week.toString())
+  if (season) params.append('season', season.toString())
+  
+  const response = await api.get(`/betting-odds/week/${week}?${params.toString()}`)
+  return response.data
+}
+
+export const getBettingOddsByGame = async (eventId: string, season?: number) => {
+  const params = season ? `?season=${season}` : ''
+  const response = await api.get(`/betting-odds/game/${eventId}${params}`)
+  return response.data
+}
+
+export const syncBettingOddsForGame = async (eventId: string, season?: number) => {
+  const params = season ? `?season=${season}` : ''
+  const response = await api.post(`/betting-odds/sync/game/${eventId}${params}`)
+  return response.data
+}
+
+export const syncBettingOddsForWeek = async (week: number, season?: number) => {
+  const params = season ? `?season=${season}` : ''
+  const response = await api.post(`/betting-odds/sync/week/${week}${params}`)
+  return response.data
+}
+
+export const getUpcomingBettingOdds = async (limit?: number) => {
+  const params = limit ? `?limit=${limit}` : ''
+  const response = await api.get(`/betting-odds/upcoming${params}`)
+  return response.data
+}
+
+export const getBettingOddsSources = async () => {
+  const response = await api.get('/betting-odds/sources')
+  return response.data
+}
+
+export const getBettingOddsStats = async () => {
+  const response = await api.get('/betting-odds/stats')
+  return response.data
+}
+
+export const syncPlayerPropsForWeek = async (week: number, season?: number, markets?: string) => {
+  const params = new URLSearchParams()
+  if (season) params.append('season', season.toString())
+  if (markets) params.append('markets', markets)
+  const response = await api.post(`/betting-odds/sync/player-props/week/${week}?${params.toString()}`)
+  return response.data
+}
+
 export default api

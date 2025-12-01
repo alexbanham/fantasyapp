@@ -21,7 +21,9 @@ import {
   updateCurrentSeason,
   autoUpdateWeek,
   updatePollingEnabled,
-  backfillBoxscores
+  backfillBoxscores,
+  syncBettingOddsForWeek,
+  syncPlayerPropsForWeek
 } from '../services/api'
 import { 
   FantasyNewsArticle, 
@@ -257,7 +259,11 @@ export const useSyncOperations = () => {
     syncingAIProjections: false,
     aiProjectionsSyncMessage: '',
     syncingBoxscores: false,
-    boxscoresSyncMessage: ''
+    boxscoresSyncMessage: '',
+    syncingBettingOdds: false,
+    bettingOddsSyncMessage: '',
+    syncingPlayerProps: false,
+    playerPropsSyncMessage: ''
   })
 
   const syncGames = async () => {
@@ -466,6 +472,55 @@ export const useSyncOperations = () => {
     }
   }
 
+  const syncBettingOdds = async (week: number, season: number) => {
+    try {
+      setSyncState(prev => ({ ...prev, syncingBettingOdds: true, bettingOddsSyncMessage: `Syncing betting odds for Week ${week}, Season ${season}...` }))
+      const data = await syncBettingOddsForWeek(week, season)
+      if (data.success) {
+        const results = data.results || {}
+        const creditsUsed = results.creditsUsed || 0
+        const successCount = results.success || 0
+        const failedCount = results.failed || 0
+        setSyncState(prev => ({ 
+          ...prev, 
+          bettingOddsSyncMessage: `Betting odds sync complete: ${successCount} games synced, ${failedCount} failed (${creditsUsed} credits used)` 
+        }))
+      } else {
+        setSyncState(prev => ({ ...prev, bettingOddsSyncMessage: `Betting odds sync failed: ${data.error || 'Unknown error'}` }))
+      }
+    } catch (error: any) {
+      setSyncState(prev => ({ ...prev, bettingOddsSyncMessage: `Betting odds sync error: ${error.message || 'Unknown error'}` }))
+    } finally {
+      setSyncState(prev => ({ ...prev, syncingBettingOdds: false }))
+      setTimeout(() => setSyncState(prev => ({ ...prev, bettingOddsSyncMessage: '' })), 8000)
+    }
+  }
+
+  const syncPlayerProps = async (week: number, season: number) => {
+    try {
+      setSyncState(prev => ({ ...prev, syncingPlayerProps: true, playerPropsSyncMessage: `Syncing player props for Week ${week}, Season ${season}...` }))
+      const data = await syncPlayerPropsForWeek(week, season)
+      if (data.success) {
+        const results = data.results || {}
+        const creditsUsed = results.creditsUsed || 0
+        const successCount = results.success || 0
+        const failedCount = results.failed || 0
+        const totalProps = results.totalProps || 0
+        setSyncState(prev => ({
+          ...prev,
+          playerPropsSyncMessage: `Player props sync complete: ${successCount} games synced, ${totalProps} props stored (${creditsUsed} credits used)` 
+        }))
+      } else {
+        setSyncState(prev => ({ ...prev, playerPropsSyncMessage: `Player props sync failed: ${data.error || 'Unknown error'}` }))
+      }
+    } catch (error: any) {
+      setSyncState(prev => ({ ...prev, playerPropsSyncMessage: `Player props sync error: ${error.message || 'Unknown error'}` }))
+    } finally {
+      setSyncState(prev => ({ ...prev, syncingPlayerProps: false }))
+      setTimeout(() => setSyncState(prev => ({ ...prev, playerPropsSyncMessage: '' })), 8000)
+    }
+  }
+
   return {
     syncState,
     syncGames,
@@ -478,7 +533,9 @@ export const useSyncOperations = () => {
     syncAIProjections,
     syncAllPlayersESPN,
     syncCurrentWeekPlayers,
-    syncAllBoxscores
+    syncAllBoxscores,
+    syncBettingOdds,
+    syncPlayerProps
   }
 }
 

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Clock, RefreshCw, Activity, CheckCircle, AlertCircle, X, Power, PowerOff, Newspaper, Users, Calendar } from 'lucide-react'
+import { Clock, RefreshCw, Activity, CheckCircle, AlertCircle, X, Power, PowerOff, Newspaper, Users, Calendar, DollarSign, User } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
@@ -22,6 +22,10 @@ interface ConfigurationModalProps {
   onSyncAllPlayers: () => void
   onSyncCurrentWeek: () => void
   onSyncAllBoxscores: () => void
+  onSyncBettingOdds: (week: number, season: number) => void
+  onSyncPlayerProps: (week: number, season: number) => void
+  currentWeek: number
+  currentSeason: number
 }
 
 const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
@@ -40,7 +44,11 @@ const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
   onSyncNews,
   onSyncAllPlayers,
   onSyncCurrentWeek,
-  onSyncAllBoxscores
+  onSyncAllBoxscores,
+  onSyncBettingOdds,
+  onSyncPlayerProps,
+  currentWeek,
+  currentSeason
 }) => {
   if (!isOpen) return null
 
@@ -193,11 +201,33 @@ const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
                 <Button 
                   variant="outline" 
                   onClick={onSyncAllBoxscores}
-                  disabled={syncState.syncingBoxscores || syncState.syncingNews || syncState.syncingPlayers}
+                  disabled={syncState.syncingBoxscores || syncState.syncingNews || syncState.syncingPlayers || syncState.syncingBettingOdds}
                   className="w-full bg-purple-50 dark:bg-purple-950 border-purple-300 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   {syncState.syncingBoxscores ? 'Syncing Boxscores...' : 'Sync All Boxscores'}
+                </Button>
+                
+                {/* Sync Betting Odds */}
+                <Button 
+                  variant="outline" 
+                  onClick={() => onSyncBettingOdds(currentWeek, currentSeason)}
+                  disabled={syncState.syncingBettingOdds || syncState.syncingPlayerProps || syncState.syncingNews || syncState.syncingPlayers || syncState.syncingBoxscores}
+                  className="w-full bg-yellow-50 dark:bg-yellow-950 border-yellow-300 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  {syncState.syncingBettingOdds ? 'Syncing Betting Odds...' : `Sync Betting Odds (Week ${currentWeek})`}
+                </Button>
+                
+                {/* Sync Player Props */}
+                <Button 
+                  variant="outline" 
+                  onClick={() => onSyncPlayerProps(currentWeek, currentSeason)}
+                  disabled={syncState.syncingPlayerProps || syncState.syncingBettingOdds || syncState.syncingNews || syncState.syncingPlayers || syncState.syncingBoxscores}
+                  className="w-full bg-purple-50 dark:bg-purple-950 border-purple-300 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900"
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  {syncState.syncingPlayerProps ? 'Syncing Player Props...' : `Sync Player Props (Week ${currentWeek})`}
                 </Button>
                 
                 {/* Status Messages */}
@@ -235,6 +265,30 @@ const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
                       <CheckCircle className="h-3 w-3 text-green-500 mr-2" />
                     )}
                     <span className="text-muted-foreground text-xs">{syncState.boxscoresSyncMessage}</span>
+                  </div>
+                )}
+                {syncState.bettingOddsSyncMessage && (
+                  <div className="flex items-center text-xs">
+                    {syncState.syncingBettingOdds ? (
+                      <Activity className="h-3 w-3 text-primary mr-2" />
+                    ) : syncState.bettingOddsSyncMessage.toLowerCase().includes('fail') || syncState.bettingOddsSyncMessage.toLowerCase().includes('error') ? (
+                      <AlertCircle className="h-3 w-3 text-red-500 mr-2" />
+                    ) : (
+                      <CheckCircle className="h-3 w-3 text-green-500 mr-2" />
+                    )}
+                    <span className="text-muted-foreground text-xs">{syncState.bettingOddsSyncMessage}</span>
+                  </div>
+                )}
+                {syncState.playerPropsSyncMessage && (
+                  <div className="flex items-center text-xs">
+                    {syncState.syncingPlayerProps ? (
+                      <Activity className="h-3 w-3 text-primary mr-2" />
+                    ) : syncState.playerPropsSyncMessage.toLowerCase().includes('fail') || syncState.playerPropsSyncMessage.toLowerCase().includes('error') ? (
+                      <AlertCircle className="h-3 w-3 text-red-500 mr-2" />
+                    ) : (
+                      <CheckCircle className="h-3 w-3 text-green-500 mr-2" />
+                    )}
+                    <span className="text-muted-foreground text-xs">{syncState.playerPropsSyncMessage}</span>
                   </div>
                 )}
               </div>

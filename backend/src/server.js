@@ -47,6 +47,7 @@ const dataRoutes = require('./routes/data');
 const espnSyncRoutes = require('./routes/espnSync');
 const espnPlayersRoutes = require('./routes/espnplayers');
 const leagueRoutes = require('./routes/league');
+const bettingOddsRoutes = require('./routes/bettingOdds');
 // Import services
 const gamePollingService = require('./services/gamePollingService');
 const Config = require('./models/Config');
@@ -109,6 +110,7 @@ app.use('/api/data', dataRoutes);
 app.use('/api/sync/espn', espnSyncRoutes);
 app.use('/api/espnplayers', espnPlayersRoutes);
 app.use('/api/league', leagueRoutes);
+app.use('/api/betting-odds', bettingOddsRoutes);
 // Health check endpoints
 app.get('/api/health', (req, res) => {
   res.json({ 

@@ -3,6 +3,7 @@ import { Card, CardContent } from '../ui/card'
 import { Trophy, TrendingUp, Zap, Flame, Users, Target, RefreshCw } from 'lucide-react'
 import { getTeamLogoWithFallback } from '../../lib/teamLogos'
 import { getGameHighlights } from '../../services/api'
+import { getCache, setCache } from '../../lib/cache'
 
 interface ImpactfulBoomBust {
   espn_id: string
@@ -113,6 +114,25 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, s
   const hasLoadedOnceRef = React.useRef(false)
   const previousWeekRef = React.useRef<number | undefined>(undefined)
   const previousSeasonRef = React.useRef<number | undefined>(undefined)
+  
+  // Cache key includes week and season for proper cache invalidation
+  const getCacheKey = () => `game_highlights_${week ?? 'current'}_${season ?? 'current'}`
+  const CACHE_TTL = 5 * 60 * 1000 // 5 minutes for highlights
+
+  // Restore cached highlights immediately on mount
+  useEffect(() => {
+    const cacheKey = getCacheKey()
+    const cachedHighlights = getCache<Highlight>(cacheKey, CACHE_TTL)
+    if (cachedHighlights) {
+      setHighlights(cachedHighlights)
+      setHasLoadedOnce(true)
+      hasLoadedOnceRef.current = true
+      setIsLoading(false)
+      // Update refs to match cached data
+      previousWeekRef.current = cachedHighlights.week
+      previousSeasonRef.current = cachedHighlights.season
+    }
+  }, [week, season])
 
   useEffect(() => {
     const fetchHighlights = async () => {
@@ -137,6 +157,9 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, s
           setError(null)
           setHasLoadedOnce(true)
           hasLoadedOnceRef.current = true
+          
+          // Cache the fresh data
+          setCache(getCacheKey(), response, CACHE_TTL)
         } else {
           setError(response.error || 'Failed to fetch highlights')
         }

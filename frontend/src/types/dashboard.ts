@@ -205,6 +205,10 @@ export interface SyncState {
   aiProjectionsSyncMessage: string
   syncingBoxscores: boolean
   boxscoresSyncMessage: string
+  syncingBettingOdds: boolean
+  bettingOddsSyncMessage: string
+  syncingPlayerProps: boolean
+  playerPropsSyncMessage: string
 }
 
 export interface AIState {

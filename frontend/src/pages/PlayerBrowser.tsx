@@ -105,6 +105,7 @@ const PlayerBrowser = () => {
   const [showFilters, setShowFilters] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState<ESPNPlayer | null>(null)
   const [showPlayerModal, setShowPlayerModal] = useState(false)
+  const [currentWeekFetched, setCurrentWeekFetched] = useState(false)
 
   // Available filter options
   const positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
@@ -121,17 +122,27 @@ const PlayerBrowser = () => {
         const data = await getAvailableWeeks()
         if (data.success && data.currentWeek) {
           setFilters(prev => ({ ...prev, week: data.currentWeek }))
+          setCurrentWeekFetched(true)
+        } else {
+          // If we can't get current week, still mark as fetched to allow loading with default week
+          setCurrentWeekFetched(true)
         }
       } catch (err) {
+        // On error, still mark as fetched to allow loading with default week
+        setCurrentWeekFetched(true)
       }
     }
     fetchCurrentWeek()
   }, [])
 
   useEffect(() => {
-    loadTopPerformers()
-    loadPlayers()
-  }, [filters.week, filters.scoringType])
+    // Only load top performers and players after current week has been fetched
+    // This ensures we always load with the current week, not the initial week: 1
+    if (currentWeekFetched) {
+      loadTopPerformers()
+      loadPlayers()
+    }
+  }, [filters.week, filters.scoringType, currentWeekFetched])
 
   useEffect(() => {
     applyFilters()

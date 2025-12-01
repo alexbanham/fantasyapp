@@ -5,6 +5,7 @@ import { Clock, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronUp, Play, Pause, T
 import { Card, CardContent } from './ui/card'
 import { Button } from './ui/button'
 import { getTeamLogoWithFallback } from '../lib/teamLogos'
+import { getCache, setCache } from '../lib/cache'
 
 interface TopScorer {
   espnId: string
@@ -75,11 +76,26 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
   const loadingScorersRef = useRef<Set<string>>(new Set())
   const onLiveGamesRefreshRef = useRef(onLiveGamesRefresh)
   const hasLoadedOnceRef = useRef(false)
+  const CACHE_KEY = 'live_games'
+  const CACHE_TTL = 2 * 60 * 1000 // 2 minutes for live games
   
   // Update ref when prop changes (doesn't cause re-render)
   useEffect(() => {
     onLiveGamesRefreshRef.current = onLiveGamesRefresh
   }, [onLiveGamesRefresh])
+
+  // Restore cached games immediately on mount
+  useEffect(() => {
+    const cachedGames = getCache<Game[]>(CACHE_KEY, CACHE_TTL)
+    if (cachedGames && cachedGames.length > 0) {
+      setGames(cachedGames)
+      setHasLoadedOnce(true)
+      hasLoadedOnceRef.current = true
+      setIsLoading(false)
+      // Set a recent lastUpdated timestamp from cache
+      setLastUpdated(new Date())
+    }
+  }, [])
 
   const fetchTopScorers = useCallback(async (gameId: string, forceRefresh = false) => {
     // Don't fetch if already loading, unless forcing refresh
@@ -173,6 +189,9 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
           setIsOnline(true)
           setHasLoadedOnce(true)
           hasLoadedOnceRef.current = true
+          
+          // Cache the fresh data
+          setCache(CACHE_KEY, newGames, CACHE_TTL)
           
           // Sync current week data to keep fantasy scorers up to date
           if (onLiveGamesRefreshRef.current && newGames.length > 0) {
@@ -316,6 +335,9 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
           setError(null)
           setHasLoadedOnce(true)
           hasLoadedOnceRef.current = true
+          
+          // Cache the fresh data
+          setCache(CACHE_KEY, newGames, CACHE_TTL)
           
           // Sync current week data to keep fantasy scorers up to date
           if (onLiveGamesRefreshRef.current && newGames.length > 0) {

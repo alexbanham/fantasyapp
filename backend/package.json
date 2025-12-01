@@ -10,7 +10,8 @@
     "data:fetch": "node src/cron/fetchData.js",
     "data:update": "node src/cron/updateData.js",
     "sync:week": "node -e \"require('dotenv').config(); require('./src/services/boxscoreSync').syncWeek(process.env.SEASON_ID, process.env.WEEK).then(r => {console.log(r); process.exit(0)}).catch(e => {console.error(e); process.exit(1)})\"",
-    "sync:backfill": "node -e \"require('dotenv').config(); require('./src/services/boxscoreSync').backfillSeason(process.env.SEASON_ID, 18).then(r => {console.log(r); process.exit(0)}).catch(e => {console.error(e); process.exit(1)})\""
+    "sync:backfill": "node -e \"require('dotenv').config(); require('./src/services/boxscoreSync').backfillSeason(process.env.SEASON_ID, 18).then(r => {console.log(r); process.exit(0)}).catch(e => {console.error(e); process.exit(1)})\"",
+    "test:betting-odds": "node src/scripts/testBettingOdds.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

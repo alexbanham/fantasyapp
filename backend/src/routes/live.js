@@ -272,34 +272,53 @@ router.get('/:eventId/scorers', async (req, res) => {
       console.log(`[SCORERS DEBUG] Fetching ${playerIds.length} player data from database for week ${currentWeek}`);
     }
     
-    // Fetch player data including weekly actuals from database
+    // Fetch player data including weekly actuals and projections from database
     const playersFromDB = await ESPNPlayer.find({ 
       espn_id: { $in: playerIds } 
-    }).select('espn_id headshot_url roster_status fantasy_team_id fantasy_team_name weekly_actuals').lean();
+    }).select('espn_id headshot_url roster_status fantasy_team_id fantasy_team_name weekly_actuals weekly_projections').lean();
+    
+    // Determine scoring type (default to PPR, but could be passed as query param)
+    const scoringType = req.query.scoringType || 'ppr';
     
     const playerDataMap = new Map();
     playersFromDB.forEach(p => {
-      // Get weekly actuals for the current week, default to PPR scoring
+      // Get weekly actuals for the current week
       // Mongoose Map fields might be serialized as objects when using .lean()
-      let weekData = {};
+      let weekActuals = {};
       if (p.weekly_actuals) {
         // Try accessing as Map first
         if (typeof p.weekly_actuals.get === 'function') {
-          weekData = p.weekly_actuals.get(currentWeek.toString()) || {};
+          weekActuals = p.weekly_actuals.get(currentWeek.toString()) || {};
         } else if (p.weekly_actuals[currentWeek.toString()]) {
           // It's an object, access directly
-          weekData = p.weekly_actuals[currentWeek.toString()];
+          weekActuals = p.weekly_actuals[currentWeek.toString()];
         }
       }
       
-      const fantasyPoints = weekData.ppr || weekData.half || weekData.std || 0;
+      // Get weekly projections for the current week
+      let weekProjections = {};
+      if (p.weekly_projections) {
+        // Try accessing as Map first
+        if (typeof p.weekly_projections.get === 'function') {
+          weekProjections = p.weekly_projections.get(currentWeek.toString()) || {};
+        } else if (p.weekly_projections[currentWeek.toString()]) {
+          // It's an object, access directly
+          weekProjections = p.weekly_projections[currentWeek.toString()];
+        }
+      }
+      
+      // Get fantasy points for the specified scoring type (default to PPR)
+      const fantasyPoints = weekActuals[scoringType] || weekActuals.ppr || weekActuals.half || weekActuals.std || 0;
+      // Get projected points for the specified scoring type (default to PPR)
+      const projectedPoints = weekProjections[scoringType] || weekProjections.ppr || weekProjections.half || weekProjections.std || null;
       
       playerDataMap.set(p.espn_id, {
         headshot_url: p.headshot_url,
         roster_status: p.roster_status,
         fantasy_team_id: p.fantasy_team_id,
         fantasy_team_name: p.fantasy_team_name,
-        fantasyPoints: fantasyPoints
+        fantasyPoints: fantasyPoints,
+        projectedPoints: projectedPoints
       });
     });
     
@@ -307,13 +326,14 @@ router.get('/:eventId/scorers', async (req, res) => {
       console.log(`[SCORERS DEBUG] Found ${playerDataMap.size} players in database`);
     }
     
-    // Add images, roster info, and fantasy points from database to the player data
+    // Add images, roster info, fantasy points, and projected points from database to the player data
     const homePlayersWithImages = boxscoreData.homePlayers.map(p => {
       const dbData = playerDataMap.get(p.espnId) || {};
       
       return {
         ...p,
         fantasyPoints: dbData.fantasyPoints || 0,
+        projectedPoints: dbData.projectedPoints !== undefined && dbData.projectedPoints !== null ? dbData.projectedPoints : null,
         headshot_url: dbData.headshot_url || null,
         roster_status: dbData.roster_status || 'unknown',
         fantasy_team_id: dbData.fantasy_team_id || null,
@@ -332,6 +352,7 @@ router.get('/:eventId/scorers', async (req, res) => {
       return {
         ...p,
         fantasyPoints: dbData.fantasyPoints || 0,
+        projectedPoints: dbData.projectedPoints !== undefined && dbData.projectedPoints !== null ? dbData.projectedPoints : null,
         headshot_url: dbData.headshot_url || null,
         roster_status: dbData.roster_status || 'unknown',
         fantasy_team_id: dbData.fantasy_team_id || null,

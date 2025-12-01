@@ -92,6 +92,8 @@ const Games = () => {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null)
   const [gameScorers, setGameScorers] = useState<GameScorers | null>(null)
   const [loadingScorers, setLoadingScorers] = useState(false)
+  const [allGameScorers, setAllGameScorers] = useState<Record<string, GameScorers>>({})
+  const [loadingScorersForGames, setLoadingScorersForGames] = useState<Set<string>>(new Set())
 
   // Mock data for highlighted players and takeaways
   const mockHighlightedPlayers: HighlightedPlayer[] = [
@@ -140,8 +142,8 @@ const Games = () => {
     try {
       setLoading(true)
       setError(null)
-      // Clear games immediately to avoid showing empty cards during the loading transition
-      setGames([])
+      // Don't clear games immediately - keep showing previous games until new ones are ready
+      // This prevents jarring transitions
       
       // Use provided season or fall back to currentSeason
       const seasonToUse = season || currentSeason
@@ -149,15 +151,64 @@ const Games = () => {
       // Fetch games in real-time from ESPN API
       const response = await getGamesByWeek(week, seasonToUse, true)
       if (response.success) {
-        setGames(response.games || [])
+        // Only update games once we have all the data
+        const fetchedGames = response.games || []
+        setGames(fetchedGames)
+        
+        // Clear old scorers when week changes
+        setAllGameScorers({})
+        
+        // Fetch scorers for all games
+        fetchScorersForGames(fetchedGames, week)
       } else {
         setError('Failed to fetch games')
+        // Clear games on error
+        setGames([])
       }
     } catch (err) {
       setError('Error fetching games')
+      // Clear games on error
+      setGames([])
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchScorersForGames = async (games: Game[], week: number) => {
+    // Fetch scorers for each game in parallel
+    const scorerPromises = games.map(async (game) => {
+      // Skip if already loading or already loaded
+      if (loadingScorersForGames.has(game.eventId) || allGameScorers[game.eventId]) {
+        return
+      }
+
+      setLoadingScorersForGames(prev => new Set(prev).add(game.eventId))
+      
+      try {
+        const response = await getGameScorers(
+          game.eventId,
+          game.homeTeam.abbreviation,
+          game.awayTeam.abbreviation,
+          week
+        )
+        if (response.success) {
+          setAllGameScorers(prev => ({
+            ...prev,
+            [game.eventId]: response
+          }))
+        }
+      } catch (err) {
+        // Silently fail for individual game scorers
+      } finally {
+        setLoadingScorersForGames(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(game.eventId)
+          return newSet
+        })
+      }
+    })
+
+    await Promise.all(scorerPromises)
   }
 
   // Fetch initial config to get current week
@@ -204,15 +255,22 @@ const Games = () => {
     try {
       const response = await getLiveGames({ live_only: true })
       if (response.success) {
-        // Update games with live data
-        setGames(prevGames => 
-          prevGames.map(game => {
+        // Update games with live data only if we have existing games
+        // This prevents updating during initial load
+        setGames(prevGames => {
+          // If we have no games, don't update (wait for main fetch to complete)
+          if (prevGames.length === 0) {
+            return prevGames
+          }
+          
+          return prevGames.map(game => {
             const liveGame = response.games.find((lg: Game) => lg.eventId === game.eventId)
             return liveGame ? { ...game, ...liveGame } : game
           })
-        )
+        })
       }
     } catch (err) {
+      // Silently fail for live updates
     }
   }
 
@@ -222,14 +280,18 @@ const Games = () => {
     }
   }, [currentWeek, currentSeason])
 
-  // Poll for live updates every 30 seconds
+  // Poll for live updates every 30 seconds, but only if we have games loaded
   useEffect(() => {
+    if (games.length === 0) {
+      return // Don't poll if no games are loaded yet
+    }
+    
     const interval = setInterval(() => {
       fetchLiveGames()
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [games.length])
 
   const getStatusBadge = (status: string, isLive: boolean) => {
     if (isLive) {
@@ -344,15 +406,22 @@ const Games = () => {
 
       {/* Games Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="p-6 animate-pulse">
-              <div className="h-4 bg-gray-200 rounded mb-4"></div>
-              <div className="h-8 bg-gray-200 rounded mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded"></div>
-            </Card>
-          ))}
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center">
+              <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+            </div>
+            <p className="text-muted-foreground">Loading games...</p>
+          </div>
         </div>
+      ) : games.length === 0 ? (
+        <Card className="p-12">
+          <div className="text-center text-muted-foreground">
+            <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-medium">No games found</p>
+            <p className="text-sm mt-2">No games scheduled for Week {currentWeek}</p>
+          </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {games.map((game) => (
@@ -435,6 +504,120 @@ const Games = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Top Fantasy Performers - Only show for completed games */}
+              {allGameScorers[game.eventId] && game.status === 'STATUS_FINAL' && (() => {
+                const scorers = allGameScorers[game.eventId]
+                
+                // Get top 2 performers per team
+                const topAway = scorers.awayPlayers.slice(0, 2)
+                const topHome = scorers.homePlayers.slice(0, 2)
+                
+                // Find busts (10+ points under projection) that aren't already in top performers
+                const awayBusts = scorers.awayPlayers
+                  .filter(p => {
+                    const diff = p.fantasyPoints - (p.projectedPoints || 0)
+                    return diff <= -10 && !topAway.some(tp => tp.espnId === p.espnId)
+                  })
+                  .slice(0, 1) // Show max 1 additional bust
+                
+                const homeBusts = scorers.homePlayers
+                  .filter(p => {
+                    const diff = p.fantasyPoints - (p.projectedPoints || 0)
+                    return diff <= -10 && !topHome.some(tp => tp.espnId === p.espnId)
+                  })
+                  .slice(0, 1) // Show max 1 additional bust
+                
+                const hasPerformers = topAway.length > 0 || topHome.length > 0 || awayBusts.length > 0 || homeBusts.length > 0
+                
+                if (!hasPerformers) return null
+                
+                const renderPlayer = (player: FantasyScorer) => {
+                  const diff = player.fantasyPoints - (player.projectedPoints || 0)
+                  const isBust = diff <= -10
+                  return (
+                    <div
+                      key={player.espnId}
+                      className={`flex items-center justify-between text-xs p-1.5 rounded ${
+                        isBust ? 'bg-red-500/10 border border-red-500/20' : 'bg-accent/50'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-1.5 flex-1 min-w-0">
+                        {player.headshot_url ? (
+                          <img
+                            src={player.headshot_url}
+                            alt={player.name}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center text-[8px] font-bold">
+                            {player.name.charAt(0)}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{player.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{player.position}</p>
+                        </div>
+                      </div>
+                      <div className="text-right ml-2">
+                        <div className="flex items-center space-x-1">
+                          <span className={`font-bold ${
+                            diff > 0 ? 'text-green-500' : diff < 0 ? 'text-red-500' : 'text-foreground'
+                          }`}>
+                            {player.fantasyPoints.toFixed(1)}
+                          </span>
+                          {player.projectedPoints !== undefined && player.projectedPoints !== null && (
+                            <span className="text-[10px] text-muted-foreground line-through">
+                              {player.projectedPoints.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                        {diff !== 0 && player.projectedPoints !== undefined && player.projectedPoints !== null && (
+                          <p className={`text-[9px] ${
+                            diff > 0 ? 'text-green-500' : 'text-red-500'
+                          }`}>
+                            {diff > 0 ? '+' : ''}{diff.toFixed(1)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                }
+                
+                return (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center space-x-1">
+                      <Star className="h-3 w-3" />
+                      <span>Top Performers</span>
+                    </h4>
+                    <div className="space-y-2">
+                      {/* Away Team Top Performers */}
+                      {(topAway.length > 0 || awayBusts.length > 0) && (
+                        <div>
+                          <p className="text-[10px] font-medium text-muted-foreground mb-1">
+                            {game.awayTeam.abbreviation}
+                          </p>
+                          <div className="space-y-1">
+                            {[...topAway, ...awayBusts].map(renderPlayer)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Home Team Top Performers */}
+                      {(topHome.length > 0 || homeBusts.length > 0) && (
+                        <div>
+                          <p className="text-[10px] font-medium text-muted-foreground mb-1">
+                            {game.homeTeam.abbreviation}
+                          </p>
+                          <div className="space-y-1">
+                            {[...topHome, ...homeBusts].map(renderPlayer)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Game Info */}
               <div className="mt-4 pt-4 border-t border-border">

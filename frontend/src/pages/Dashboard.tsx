@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Calendar } from 'lucide-react'
 import LiveScoreStrip from '../components/LiveScoreStrip'
-import ConfigurationModal from '../components/dashboard/ConfigurationModal'
 import NFLWeekDisplay from '../components/dashboard/NFLWeekDisplay'
 import GameHighlights from '../components/dashboard/GameHighlights'
 import MatchupModal from '../components/dashboard/MatchupModal'
@@ -10,21 +9,16 @@ import {
   useSyncOperations, 
   useConfig
 } from '../hooks/useDashboard'
-import { ConfigState } from '../types/dashboard'
 import { getLiveGamesOnly, getLeagueOverview, getLeagueBoxscores, syncRosteredPlayersCurrentWeek, LeagueMatchup, DetailedMatchup } from '../services/api'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
+import { getCache, setCache } from '../lib/cache'
 
-interface DashboardProps {
-  configModalOpen: boolean
-  onConfigModalClose: () => void
-}
-
-const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClose }) => {
-  // Custom hooks
-  const { pollingStatus, togglePollingConfig } = usePollingStatus()
-  const { syncState, syncFantasyNewsData, syncAllPlayersESPN, syncCurrentWeekPlayers, syncAllBoxscores } = useSyncOperations()
-  const { config, configState, setConfigState, updateWeek, updateSeason, autoUpdateWeekData, fetchConfig } = useConfig()
+const Dashboard: React.FC = () => {
+  // Custom hooks - only for dashboard-specific functionality
+  const { pollingStatus } = usePollingStatus()
+  const { syncCurrentWeekPlayers } = useSyncOperations()
+  const { config } = useConfig()
   
   // Check if there are live games
   const [hasLiveGames, setHasLiveGames] = useState(false)
@@ -108,6 +102,9 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
       
       if (leagueData.success && leagueData.matchups) {
         setMatchups(leagueData.matchups)
+        // Cache matchups
+        const matchupsCacheKey = `dashboard_matchups_${config.currentSeason}_${config.currentWeek}`
+        setCache(matchupsCacheKey, leagueData.matchups, 5 * 60 * 1000) // 5 minutes
       }
       
       // Fetch detailed boxscore data
@@ -118,6 +115,9 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
       
       if (boxscoreData.success && boxscoreData.matchups) {
         setDetailedMatchups(boxscoreData.matchups)
+        // Cache detailed matchups
+        const detailedCacheKey = `dashboard_detailed_matchups_${config.currentSeason}_${config.currentWeek}`
+        setCache(detailedCacheKey, boxscoreData.matchups, 5 * 60 * 1000) // 5 minutes
       }
     } catch (error) {
       console.error('Error fetching matchups:', error)
@@ -125,6 +125,26 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
       setLoadingMatchups(false)
     }
   }
+
+  // Restore cached matchups immediately on mount
+  useEffect(() => {
+    if (config?.currentWeek && config?.currentSeason) {
+      const matchupsCacheKey = `dashboard_matchups_${config.currentSeason}_${config.currentWeek}`
+      const detailedCacheKey = `dashboard_detailed_matchups_${config.currentSeason}_${config.currentWeek}`
+      
+      const cachedMatchups = getCache<LeagueMatchup[]>(matchupsCacheKey, 5 * 60 * 1000)
+      const cachedDetailed = getCache<DetailedMatchup[]>(detailedCacheKey, 5 * 60 * 1000)
+      
+      if (cachedMatchups && cachedMatchups.length > 0) {
+        setMatchups(cachedMatchups)
+        setLoadingMatchups(false)
+      }
+      
+      if (cachedDetailed && cachedDetailed.length > 0) {
+        setDetailedMatchups(cachedDetailed)
+      }
+    }
+  }, [config?.currentWeek, config?.currentSeason])
 
   // Fetch matchups when config changes
   useEffect(() => {
@@ -387,26 +407,6 @@ const Dashboard: React.FC<DashboardProps> = ({ configModalOpen, onConfigModalClo
 
         </div>
       </div>
-
-      {/* Configuration Modal */}
-      <ConfigurationModal
-        isOpen={configModalOpen}
-        onClose={onConfigModalClose}
-        config={config}
-        configState={configState}
-        onConfigStateChange={handleConfigStateChange}
-        onUpdateWeek={updateWeek}
-        onUpdateSeason={updateSeason}
-        onAutoUpdateWeek={autoUpdateWeekData}
-        pollingStatus={pollingStatus}
-        configEnabled={config?.pollingEnabled || false}
-        onTogglePolling={handleTogglePolling}
-        syncState={syncState}
-        onSyncNews={handleSyncNews}
-        onSyncAllPlayers={syncAllPlayersESPN}
-        onSyncCurrentWeek={syncCurrentWeekPlayers}
-        onSyncAllBoxscores={syncAllBoxscores}
-      />
 
       {/* Matchup Modal */}
       <MatchupModal

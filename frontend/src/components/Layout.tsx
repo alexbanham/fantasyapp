@@ -11,7 +11,8 @@ import {
   Settings,
   Trophy,
   TrendingUp,
-  Newspaper
+  Newspaper,
+  DollarSign
 } from 'lucide-react'
 import { Button } from './ui/button'
 import ColorSchemeToggler from './ColorSchemeToggler'
@@ -44,6 +45,7 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
     { name: 'Players', href: '/players', icon: Search, current: location.pathname.startsWith('/players') },
     { name: 'Games', href: '/games', icon: Calendar, current: location.pathname === '/games' },
     { name: 'News', href: '/news', icon: Newspaper, current: location.pathname === '/news' },
+    { name: 'Money', href: '/money', icon: DollarSign, current: location.pathname === '/money' },
     { name: 'Data', href: '/data', icon: Database, current: location.pathname === '/data' },
   ]
 
