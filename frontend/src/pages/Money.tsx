@@ -14,7 +14,8 @@ import {
   BarChart3,
   ChevronDown,
   ChevronUp,
-  User
+  User,
+  Loader2
 } from 'lucide-react'
 import { 
   getBettingOddsByWeek, 
@@ -29,15 +30,21 @@ const Money = () => {
   const [odds, setOdds] = useState<BettingOdds[]>([])
   const [currentWeek, setCurrentWeek] = useState(1)
   const [currentSeason, setCurrentSeason] = useState(new Date().getFullYear())
-  const [loading, setLoading] = useState(true)
+  const [loadingConfig, setLoadingConfig] = useState(true)
+  const [loadingOdds, setLoadingOdds] = useState(false)
+  const [loadingStats, setLoadingStats] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<any>(null)
   const [expandedGames, setExpandedGames] = useState<Set<string>>(new Set())
+
+  // Combined loading state - show spinner until everything is loaded
+  const isLoading = loadingConfig || loadingOdds || loadingStats
 
   useEffect(() => {
     console.log('[Money Page] Component mounted, fetching config...')
     const fetchConfig = async () => {
       try {
+        setLoadingConfig(true)
         const config = await getConfig()
         console.log('[Money Page] Config received:', {
           success: config.success,
@@ -53,6 +60,8 @@ const Money = () => {
         }
       } catch (err) {
         console.error('[Money Page] Error fetching config:', err)
+      } finally {
+        setLoadingConfig(false)
       }
     }
     fetchConfig()
@@ -60,19 +69,19 @@ const Money = () => {
 
   useEffect(() => {
     console.log(`[Money Page] Week/Season changed: Week ${currentWeek}, Season ${currentSeason}`)
-    if (currentWeek > 0 && currentSeason > 0) {
+    if (currentWeek > 0 && currentSeason > 0 && !loadingConfig) {
       console.log('[Money Page] Fetching odds and stats for new week/season...')
       fetchOdds()
       fetchStats()
     } else {
       console.warn('[Money Page] Invalid week or season, skipping fetch')
     }
-  }, [currentWeek, currentSeason])
+  }, [currentWeek, currentSeason, loadingConfig])
 
   const fetchOdds = async () => {
     try {
       console.log(`[Money Page] Fetching odds for Week ${currentWeek}, Season ${currentSeason}`)
-      setLoading(true)
+      setLoadingOdds(true)
       setError(null)
       
       const startTime = Date.now()
@@ -115,7 +124,7 @@ const Money = () => {
       })
       setError(err.message || 'Error fetching betting odds')
     } finally {
-      setLoading(false)
+      setLoadingOdds(false)
       console.log('[Money Page] Fetch odds completed')
     }
   }
@@ -123,6 +132,7 @@ const Money = () => {
   const fetchStats = async () => {
     try {
       console.log('[Money Page] Fetching betting odds statistics...')
+      setLoadingStats(true)
       const response = await getBettingOddsStats()
       
       if (response.success) {
@@ -140,6 +150,8 @@ const Money = () => {
       }
     } catch (err) {
       console.error('[Money Page] Error fetching stats:', err)
+    } finally {
+      setLoadingStats(false)
     }
   }
 
@@ -304,8 +316,8 @@ const Money = () => {
           </Card>
         </div>
 
-        {/* Stats */}
-        {stats && (
+        {/* Stats - Only show when not loading */}
+        {!isLoading && stats && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
@@ -342,8 +354,8 @@ const Money = () => {
           </div>
         )}
 
-        {/* Credit Status */}
-        {stats?.oddsApiCredits && (
+        {/* Credit Status - Only show when not loading */}
+        {!isLoading && stats?.oddsApiCredits && (
           <Card className="mb-6 border-primary/20">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -375,25 +387,23 @@ const Money = () => {
           </Card>
         )}
 
-        {/* Error State */}
-        {error && (
-          <Card className="p-4 border-red-200 bg-red-50 dark:bg-red-950/20 glass border-border/30 mb-6">
-            <p className="text-red-600 dark:text-red-400">{error}</p>
-          </Card>
-        )}
-
-        {/* Loading State */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} className="p-6 animate-pulse">
-                <div className="h-4 bg-gray-200 rounded mb-4"></div>
-                <div className="h-8 bg-gray-200 rounded mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded"></div>
-              </Card>
-            ))}
+        {/* Loading State - Show spinner until everything is loaded */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Loading betting odds...</p>
           </div>
-        ) : odds.length === 0 ? (
+        ) : (
+          <>
+            {/* Error State */}
+            {error && (
+              <Card className="p-4 border-red-200 bg-red-50 dark:bg-red-950/20 glass border-border/30 mb-6">
+                <p className="text-red-600 dark:text-red-400">{error}</p>
+              </Card>
+            )}
+
+            {/* Empty State */}
+            {odds.length === 0 ? (
           <Card>
             <CardContent className="p-8">
               <div className="text-center text-muted-foreground">
@@ -405,9 +415,9 @@ const Money = () => {
               </div>
             </CardContent>
           </Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {odds.map((gameOdds) => {
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {odds.map((gameOdds) => {
               const expanded = isExpanded(gameOdds._id)
               return (
               <Card key={gameOdds._id} className="hover:shadow-lg transition-all">
@@ -931,7 +941,9 @@ const Money = () => {
               </Card>
               )
             })}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
