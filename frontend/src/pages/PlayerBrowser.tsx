@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -86,13 +86,91 @@ interface PlayerFilters {
   rosterStatus: string
 }
 
+// Separate search input component - uses uncontrolled input to prevent re-renders
+const SearchInput = memo(({ 
+  activeSearchTerm, 
+  searching, 
+  onSearch, 
+  onClearSearch
+}: {
+  activeSearchTerm: string
+  searching: boolean
+  onSearch: (searchValue: string) => void
+  onClearSearch: () => void
+}) => {
+  const inputRef = useRef<HTMLInputElement>(null)
+  
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && inputRef.current) {
+      onSearch(inputRef.current.value)
+    }
+  }, [onSearch])
+  
+  const handleSearchClick = useCallback(() => {
+    if (inputRef.current) {
+      onSearch(inputRef.current.value)
+    }
+  }, [onSearch])
+  
+  const handleClear = useCallback(() => {
+    if (inputRef.current) {
+      inputRef.current.value = ''
+    }
+    onClearSearch()
+  }, [onClearSearch])
+  
+  return (
+    <div className="flex-1 flex items-center gap-2">
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          ref={inputRef}
+          placeholder="Search players by name, team, or position... (Press Enter to search)"
+          onKeyDown={handleKeyDown}
+          className={cn("pl-10", activeSearchTerm && "pr-10")}
+          disabled={searching}
+          defaultValue={activeSearchTerm}
+        />
+        {activeSearchTerm && !searching && (
+          <button
+            onClick={handleClear}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            type="button"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <Button
+        onClick={handleSearchClick}
+        disabled={searching}
+        className="shrink-0"
+      >
+        {searching ? (
+          <div className="flex items-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <span>Searching...</span>
+          </div>
+        ) : (
+          <>
+            <Search className="h-4 w-4 mr-2" />
+            Search
+          </>
+        )}
+      </Button>
+    </div>
+  )
+})
+
+SearchInput.displayName = 'SearchInput'
+
 const PlayerBrowser = () => {
   const [players, setPlayers] = useState<ESPNPlayer[]>([])
-  const [filteredPlayers, setFilteredPlayers] = useState<ESPNPlayer[]>([])
   const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([])
   const [cumulativeLeaders, setCumulativeLeaders] = useState<Record<string, Array<{ player: ESPNPlayer; total: number }>>>({})
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [activeSearchTerm, setActiveSearchTerm] = useState('')
+  const [searching, setSearching] = useState(false)
   const [filters, setFilters] = useState<PlayerFilters>({
     position: '',
     team: '',
@@ -144,11 +222,105 @@ const PlayerBrowser = () => {
     }
   }, [filters.week, filters.scoringType, currentWeekFetched])
 
-  useEffect(() => {
-    applyFilters()
-  }, [players, searchTerm, filters.position, filters.team, filters.sortBy, filters.sortOrder, filters.rosterStatus])
+  // Function to trigger search - only updates state, doesn't cause re-renders during typing
+  const handleSearch = useCallback((searchValue: string) => {
+    if (searching) return // Prevent multiple simultaneous searches
+    setSearching(true)
+    // Use setTimeout to allow UI to update and show spinner before heavy computation
+    setTimeout(() => {
+      setActiveSearchTerm(searchValue)
+      setSearching(false)
+    }, 0)
+  }, [searching])
+
+  // Function to clear search
+  const handleClearSearch = useCallback(() => {
+    setActiveSearchTerm('')
+  }, [])
+
+  // Helper function to calculate total fantasy points from weekly actuals
+  const calculateTotalFantasyPoints = useCallback((player: ESPNPlayer): number => {
+    if (!player || !player.weekly_actuals) return 0
+    
+    const actuals = Object.values(player.weekly_actuals)
+    const total = actuals.reduce((sum, week) => {
+      if (week && typeof week.std === 'number' && Number.isFinite(week.std)) {
+        return sum + week.std
+      }
+      return sum
+    }, 0)
+    return total
+  }, [])
   
-  // Note: No need to debounce or reload from backend when searching - client-side filtering handles it
+  // Memoize filtered results to avoid recalculating on every render
+  const filteredPlayers = useMemo(() => {
+    let filtered = [...players]
+
+    // Search filter
+    if (activeSearchTerm) {
+      const searchLower = activeSearchTerm.toLowerCase()
+      filtered = filtered.filter(player => 
+        (player.name && player.name.toLowerCase().includes(searchLower)) ||
+        (player.pro_team_id && player.pro_team_id.toLowerCase().includes(searchLower)) ||
+        (player.position && player.position.toLowerCase().includes(searchLower))
+      )
+    }
+
+    // Position filter
+    if (filters.position) {
+      filtered = filtered.filter(player => {
+        if (!player.position) return false
+        // Handle D/ST normalization - both "DST" and "D/ST" should match D/ST players
+        if (filters.position === 'DST') {
+          return player.position === 'DST' || player.position === 'D/ST'
+        }
+        return player.position === filters.position
+      })
+    }
+
+    // Team filter
+    if (filters.team) {
+      filtered = filtered.filter(player => player.pro_team_id && player.pro_team_id === filters.team)
+    }
+
+    // Roster status filter
+    if (filters.rosterStatus) {
+      filtered = filtered.filter(player => player.roster_status === filters.rosterStatus)
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      let aValue, bValue
+
+      if (filters.sortBy === 'fantasy_points') {
+        // Use total fantasy points across all weeks
+        aValue = calculateTotalFantasyPoints(a)
+        bValue = calculateTotalFantasyPoints(b)
+      } else if (filters.sortBy === 'projected_points') {
+        aValue = a.projected_points || 0
+        bValue = b.projected_points || 0
+      } else {
+        aValue = a[filters.sortBy as keyof ESPNPlayer]
+        bValue = b[filters.sortBy as keyof ESPNPlayer]
+      }
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        const av = aValue.toLowerCase()
+        const bv = bValue.toLowerCase()
+        return filters.sortOrder === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+      }
+
+      const avNum = Number(aValue)
+      const bvNum = Number(bValue)
+      if (!Number.isNaN(avNum) && !Number.isNaN(bvNum)) {
+        return filters.sortOrder === 'asc' ? avNum - bvNum : bvNum - avNum
+      }
+
+      return 0
+    })
+
+    return filtered
+  }, [players, activeSearchTerm, filters.position, filters.team, filters.sortBy, filters.sortOrder, filters.rosterStatus, calculateTotalFantasyPoints])
 
   // Recompute cumulative leaders through selected week
   useEffect(() => {
@@ -172,8 +344,14 @@ const PlayerBrowser = () => {
     }
 
     const byPosition: Record<string, Array<{ player: ESPNPlayer; total: number }>> = {}
+    // Positions to exclude from "Best Through Selected Week"
+    const excludedPositions = ['DE', 'RB/WR', 'WR/TE']
+    
     players.forEach((p) => {
       const pos = (p.position || 'OTHER').toUpperCase()
+      // Skip excluded positions
+      if (excludedPositions.includes(pos)) return
+      
       const total = sumThroughWeek(p)
       if (!byPosition[pos]) byPosition[pos] = []
       byPosition[pos].push({ player: p, total })
@@ -227,7 +405,7 @@ const PlayerBrowser = () => {
     }
   }
 
-  const handlePlayerClick = async (player: ESPNPlayer) => {
+  const handlePlayerClick = useCallback(async (player: ESPNPlayer) => {
       // If this is a top performer (missing weekly data), fetch full player data
       if (!player.weekly_actuals && !player.weekly_projections && player.espn_id) {
         try {
@@ -248,67 +426,8 @@ const PlayerBrowser = () => {
       }
     
     setShowPlayerModal(true);
-  }
+  }, [])
 
-  const applyFilters = () => {
-    let filtered = [...players]
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(player => 
-        (player.name && player.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (player.pro_team_id && player.pro_team_id.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (player.position && player.position.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
-    }
-
-    // Position filter
-    if (filters.position) {
-      filtered = filtered.filter(player => player.position && player.position === filters.position)
-    }
-
-    // Team filter
-    if (filters.team) {
-      filtered = filtered.filter(player => player.pro_team_id && player.pro_team_id === filters.team)
-    }
-
-    // Roster status filter
-    if (filters.rosterStatus) {
-      filtered = filtered.filter(player => player.roster_status === filters.rosterStatus)
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      let aValue, bValue
-
-      if (filters.sortBy === 'fantasy_points') {
-        aValue = a.fantasy_points || 0
-        bValue = b.fantasy_points || 0
-      } else if (filters.sortBy === 'projected_points') {
-        aValue = a.projected_points || 0
-        bValue = b.projected_points || 0
-      } else {
-        aValue = a[filters.sortBy as keyof ESPNPlayer]
-        bValue = b[filters.sortBy as keyof ESPNPlayer]
-      }
-
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        const av = aValue.toLowerCase()
-        const bv = bValue.toLowerCase()
-        return filters.sortOrder === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
-      }
-
-      const avNum = Number(aValue)
-      const bvNum = Number(bValue)
-      if (!Number.isNaN(avNum) && !Number.isNaN(bvNum)) {
-        return filters.sortOrder === 'asc' ? avNum - bvNum : bvNum - avNum
-      }
-
-      return 0
-    })
-
-    setFilteredPlayers(filtered)
-  }
 
   const getPositionColor = (position: string) => {
     switch (position) {
@@ -500,7 +619,7 @@ const PlayerBrowser = () => {
     )
   }
 
-  const PlayerCard = ({ player }: { player: ESPNPlayer }) => (
+  const PlayerCard = memo(({ player }: { player: ESPNPlayer }) => (
     <Card 
       className="hover:shadow-lg transition-all duration-200 cursor-pointer group"
       onClick={() => handlePlayerClick(player)}
@@ -508,7 +627,16 @@ const PlayerBrowser = () => {
       <CardContent className="p-4">
         <div className="flex items-center space-x-3">
           <div className="relative">
-            {player.headshot_url ? (
+            {(player.position === 'DST' || player.position === 'D/ST') && player.pro_team_id ? (
+              <img 
+                src={getTeamLogoWithFallback(player.pro_team_id)} 
+                alt={player.name}
+                className="w-12 h-12 rounded-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=random&color=fff&size=48`
+                }}
+              />
+            ) : player.headshot_url ? (
               <img 
                 src={player.headshot_url} 
                 alt={player.name}
@@ -565,6 +693,17 @@ const PlayerBrowser = () => {
             )}
             
             <div className="flex items-center space-x-3 mt-2 text-xs text-muted-foreground">
+              {(() => {
+                const totalPoints = calculateTotalFantasyPoints(player)
+                return totalPoints > 0 && (
+                  <div className="flex items-center space-x-1">
+                    <BarChart3 className="h-3 w-3 text-purple-500" />
+                    <span className="font-semibold text-purple-600">
+                      {totalPoints.toFixed(1)} total
+                    </span>
+                  </div>
+                )
+              })()}
               {player.fantasy_points !== null && (
                 <div className="flex items-center space-x-1">
                   <Trophy className="h-3 w-3 text-green-500" />
@@ -586,7 +725,9 @@ const PlayerBrowser = () => {
         </div>
       </CardContent>
     </Card>
-  )
+  ))
+  
+  PlayerCard.displayName = 'PlayerCard'
 
   if (loading) {
     return (
@@ -663,14 +804,19 @@ const PlayerBrowser = () => {
                 {(() => {
                   // Order positions in a consistent way
                   const order = ['QB', 'RB', 'WR', 'TE', 'DST', 'D/ST', 'K']
-                  const entries = Object.entries(cumulativeLeaders).sort(([a], [b]) => {
-                    const ia = order.indexOf(a)
-                    const ib = order.indexOf(b)
-                    if (ia === -1 && ib === -1) return a.localeCompare(b)
-                    if (ia === -1) return 1
-                    if (ib === -1) return -1
-                    return ia - ib
-                  })
+                  // Positions to exclude from display
+                  const excludedPositions = ['DE', 'RB/WR', 'WR/TE']
+                  
+                  const entries = Object.entries(cumulativeLeaders)
+                    .filter(([pos]) => !excludedPositions.includes(pos.toUpperCase()))
+                    .sort(([a], [b]) => {
+                      const ia = order.indexOf(a)
+                      const ib = order.indexOf(b)
+                      if (ia === -1 && ib === -1) return a.localeCompare(b)
+                      if (ia === -1) return 1
+                      if (ib === -1) return -1
+                      return ia - ib
+                    })
                   return entries.map(([pos, list]) => (
                     <div key={pos} className="space-y-2">
                       <div className="flex items-center justify-between border-b pb-1">
@@ -842,17 +988,12 @@ const PlayerBrowser = () => {
           <CardContent className="p-4">
             <div className="flex flex-col lg:flex-row gap-4">
               {/* Search */}
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search players by name, team, or position..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
+              <SearchInput
+                activeSearchTerm={activeSearchTerm}
+                searching={searching}
+                onSearch={handleSearch}
+                onClearSearch={handleClearSearch}
+              />
               
               {/* Position Filter Toggle Buttons */}
               <div className="flex items-center space-x-2">
@@ -977,7 +1118,16 @@ const PlayerBrowser = () => {
         {/* Results Summary */}
         <div className="flex items-center justify-between">
           <p className="text-muted-foreground">
-            Showing {filteredPlayers.length} of {players.length} players
+            {activeSearchTerm ? (
+              <>
+                Showing {filteredPlayers.length} result{filteredPlayers.length !== 1 ? 's' : ''} for &quot;{activeSearchTerm}&quot;
+                {filteredPlayers.length < players.length && (
+                  <span className="ml-1">(of {players.length} total players)</span>
+                )}
+              </>
+            ) : (
+              <>Showing {filteredPlayers.length} of {players.length} players</>
+            )}
           </p>
         </div>
 
@@ -1012,7 +1162,16 @@ const PlayerBrowser = () => {
             <Card className="border-0 shadow-none">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  {selectedPlayer?.headshot_url && (
+                  {(selectedPlayer?.position === 'DST' || selectedPlayer?.position === 'D/ST') && selectedPlayer?.pro_team_id ? (
+                    <img 
+                      src={getTeamLogoWithFallback(selectedPlayer.pro_team_id)} 
+                      alt={selectedPlayer.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPlayer?.name || '')}&background=random&color=fff&size=48`
+                      }}
+                    />
+                  ) : selectedPlayer?.headshot_url ? (
                     <img 
                       src={selectedPlayer.headshot_url} 
                       alt={selectedPlayer.name}
@@ -1021,7 +1180,7 @@ const PlayerBrowser = () => {
                         e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPlayer?.name || '')}&background=random&color=fff&size=48`
                       }}
                     />
-                  )}
+                  ) : null}
                   <div>
                     <CardTitle className="text-2xl font-bold">{selectedPlayer?.name}</CardTitle>
                     <div className="flex items-center space-x-2 mt-1">

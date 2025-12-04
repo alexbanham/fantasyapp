@@ -189,7 +189,8 @@ const Dashboard: React.FC = () => {
               <div className="mb-4 sm:mb-6">
                 <GameHighlights 
                   week={config?.currentWeek} 
-                  season={config?.currentSeason} 
+                  season={config?.currentSeason}
+                  isPollingActive={pollingStatus.isPolling}
                 />
               </div>
             )}

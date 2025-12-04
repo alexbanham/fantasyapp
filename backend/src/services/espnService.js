@@ -705,8 +705,21 @@ class ESPNService {
   }
 
   calculateFantasyPoints(stats) {
-    if (!stats || stats.usesPoints) return null;
+    if (!stats) return null;
     
+    // For D/ST and K players, ESPN provides points directly (usesPoints: true)
+    // Extract points from appliedTotal or total field
+    if (stats.usesPoints) {
+      if (stats.appliedTotal !== undefined && stats.appliedTotal !== null) {
+        return stats.appliedTotal;
+      }
+      if (stats.total !== undefined && stats.total !== null) {
+        return stats.total;
+      }
+      return null;
+    }
+    
+    // For skill position players, calculate from stats
     return (stats.receivingYards || 0) * 0.1 + 
            (stats.receivingReceptions || 0) * 1 + 
            (stats.receivingTouchdowns || 0) * 6 +
@@ -1116,25 +1129,110 @@ class ESPNService {
 
       // Process free agents
       if (freeAgentsResult.success) {
-        freeAgents = freeAgentsResult.players.map(player => ({
-          espnId: player.id,
-          name: player.fullName,
-          firstName: player.firstName,
-          lastName: player.lastName,
-          position: this.mapPosition(player.defaultPosition),
-          proTeamId: this.mapTeamId(player.proTeam),
-          jerseyNumber: player.jerseyNumber,
-          rosterStatus: 'free_agent',
-          teamId: null,
-          teamName: null,
-          lineupSlotId: null,
-          totalPoints: this.calculateFantasyPoints(player.rawStatsForScoringPeriod),
-          projectedPoints: this.calculateFantasyPoints(player.projectedRawStatsForScoringPeriod),
-          week: scoringPeriodId,
-          season: seasonId,
-          lastUpdated: new Date()
-        }));
+        console.log(`[getComprehensiveWeekData] Week ${scoringPeriodId} - Processing ${freeAgentsResult.players.length} free agents`);
+        
+        // Separate D/ST players from other free agents
+        // D/ST players need stats fetched via getPlayerStatsForIds because free agents API doesn't include their stats
+        const dstFreeAgents = freeAgentsResult.players.filter(p => {
+          const rawPos = p.defaultPosition;
+          const mappedPos = this.mapPosition(rawPos);
+          return mappedPos === 'D/ST' || mappedPos === 'DST' || rawPos === 'D/ST' || rawPos === 'DST' || rawPos === 16;
+        });
+        const nonDSTFreeAgents = freeAgentsResult.players.filter(p => {
+          const rawPos = p.defaultPosition;
+          const mappedPos = this.mapPosition(rawPos);
+          return mappedPos !== 'D/ST' && mappedPos !== 'DST' && rawPos !== 'D/ST' && rawPos !== 'DST' && rawPos !== 16;
+        });
+        
+        console.log(`[getComprehensiveWeekData] Week ${scoringPeriodId} - Found ${dstFreeAgents.length} D/ST free agents, ${nonDSTFreeAgents.length} non-D/ST free agents`);
+        
+        // Fetch stats for D/ST free agents using getPlayerStatsForIds (same method as rostered players)
+        let dstFreeAgentsWithStats = [];
+        if (dstFreeAgents.length > 0) {
+          try {
+            const dstIds = dstFreeAgents.map(p => p.id);
+            console.log(`[getComprehensiveWeekData] Week ${scoringPeriodId} - Fetching stats for ${dstIds.length} D/ST free agents...`);
+            const dstStatsResult = await this.getPlayerStatsForIds(dstIds, seasonId, scoringPeriodId);
+            
+            if (dstStatsResult.success) {
+              // Create a map of player ID to stats
+              const statsMap = new Map();
+              dstStatsResult.playerStats.forEach(stat => {
+                statsMap.set(stat.playerId, stat);
+              });
+              
+              // Map D/ST free agents with their stats
+              dstFreeAgentsWithStats = dstFreeAgents.map(player => {
+                const stats = statsMap.get(player.id);
+                const mappedPos = this.mapPosition(player.defaultPosition);
+                const mappedTeam = this.mapTeamId(player.proTeam);
+                
+                return {
+                  espnId: player.id,
+                  name: player.fullName,
+                  firstName: player.firstName,
+                  lastName: player.lastName,
+                  position: mappedPos,
+                  proTeamId: mappedTeam,
+                  jerseyNumber: player.jerseyNumber,
+                  rosterStatus: 'free_agent',
+                  teamId: null,
+                  teamName: null,
+                  lineupSlotId: null,
+                  totalPoints: stats?.actualPoints || null,
+                  projectedPoints: stats?.projectedPoints || null,
+                  week: scoringPeriodId,
+                  season: seasonId,
+                  lastUpdated: new Date()
+                };
+              });
+              
+              console.log(`[getComprehensiveWeekData] Week ${scoringPeriodId} - Successfully fetched stats for ${dstFreeAgentsWithStats.length} D/ST free agents`);
+              dstFreeAgentsWithStats.forEach((dst, idx) => {
+                console.log(`[getComprehensiveWeekData] Week ${scoringPeriodId} - D/ST FA #${idx + 1}: ${dst.name} (${dst.proTeamId}) - Points: ${dst.totalPoints}, Proj: ${dst.projectedPoints}`);
+              });
+            } else {
+              console.error(`[getComprehensiveWeekData] Week ${scoringPeriodId} - Failed to fetch D/ST stats: ${dstStatsResult.error}`);
+            }
+          } catch (error) {
+            console.error(`[getComprehensiveWeekData] Week ${scoringPeriodId} - Error fetching D/ST stats:`, error.message);
+          }
+        }
+        
+        // Process non-D/ST free agents normally (they have stats in the free agents response)
+        const nonDSTFreeAgentsProcessed = nonDSTFreeAgents.map(player => {
+          const mappedPos = this.mapPosition(player.defaultPosition);
+          const mappedTeam = this.mapTeamId(player.proTeam);
+          const actualPoints = this.calculateFantasyPoints(player.rawStatsForScoringPeriod);
+          const projectedPoints = this.calculateFantasyPoints(player.projectedRawStatsForScoringPeriod);
+          
+          return {
+            espnId: player.id,
+            name: player.fullName,
+            firstName: player.firstName,
+            lastName: player.lastName,
+            position: mappedPos,
+            proTeamId: mappedTeam,
+            jerseyNumber: player.jerseyNumber,
+            rosterStatus: 'free_agent',
+            teamId: null,
+            teamName: null,
+            lineupSlotId: null,
+            totalPoints: actualPoints,
+            projectedPoints: projectedPoints,
+            week: scoringPeriodId,
+            season: seasonId,
+            lastUpdated: new Date()
+          };
+        });
+        
+        // Combine all free agents (D/ST with stats + non-D/ST)
+        freeAgents = [...dstFreeAgentsWithStats, ...nonDSTFreeAgentsProcessed];
+        console.log(`[getComprehensiveWeekData] Week ${scoringPeriodId} - Total free agents processed: ${freeAgents.length} (${dstFreeAgentsWithStats.length} D/ST, ${nonDSTFreeAgentsProcessed.length} non-D/ST)`);
+        
         allPlayers = [...allPlayers, ...freeAgents];
+      } else {
+        console.log(`[getComprehensiveWeekData] Week ${scoringPeriodId} - Free agents fetch failed: ${freeAgentsResult.error || 'Unknown error'}`);
       }
 
       // Extract player stats for database storage

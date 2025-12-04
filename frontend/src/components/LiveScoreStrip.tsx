@@ -745,7 +745,21 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                                           }`}
                                         >
                                           <div className="flex items-center space-x-2 flex-1 min-w-0">
-                                            {scorer.headshot_url ? (
+                                            {(scorer.position === 'DST' || scorer.position === 'D/ST') && scorer.proTeamId ? (
+                                              <img 
+                                                src={getTeamLogoWithFallback(scorer.proTeamId)} 
+                                                alt={scorer.name}
+                                                className="w-6 h-6 rounded-full object-cover border border-border/30 flex-shrink-0"
+                                                onError={(e) => {
+                                                  const target = e.target as HTMLImageElement;
+                                                  target.style.display = 'none';
+                                                  const parent = target.parentElement;
+                                                  if (parent) {
+                                                    parent.innerHTML = `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-300 text-[10px]">${scorer.name.charAt(0)}</span></div>`;
+                                                  }
+                                                }}
+                                              />
+                                            ) : scorer.headshot_url ? (
                                               <img 
                                                 src={scorer.headshot_url} 
                                                 alt={scorer.name}

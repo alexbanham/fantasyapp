@@ -21,7 +21,10 @@ router.get('/', async (req, res) => {
     } = req.query;
     // Build query
     const query = {};
-    if (position) query.position = position;
+    if (position) {
+      // Normalize DST to D/ST for database consistency
+      query.position = position === 'DST' ? 'D/ST' : position;
+    }
     if (team) query.pro_team_id = team;
     if (rosterStatus) query.roster_status = rosterStatus;
     // Text search on name
@@ -147,7 +150,9 @@ router.get('/top-performers', async (req, res) => {
       const weekData = weeklyActuals[currentWeek.toString()];
       // Check if player has actual points for this week and meets position filter
       const hasPoints = weekData && weekData[scoringType] !== null && weekData[scoringType] !== undefined && weekData[scoringType] > 0;
-      const matchesPosition = !position || player.position === position;
+      // Normalize DST to D/ST for position matching
+      const normalizedPosition = position === 'DST' ? 'D/ST' : position;
+      const matchesPosition = !position || player.position === normalizedPosition;
       return hasPoints && matchesPosition;
     });
     // Sort by fantasy points (descending)
@@ -228,7 +233,10 @@ router.get('/free-agents', async (req, res) => {
     } = req.query;
     // Build query for free agents only
     const query = { roster_status: 'free_agent' };
-    if (position) query.position = position;
+    if (position) {
+      // Normalize DST to D/ST for database consistency
+      query.position = position === 'DST' ? 'D/ST' : position;
+    }
     if (team) query.pro_team_id = team;
     // Text search on name
     if (search) {

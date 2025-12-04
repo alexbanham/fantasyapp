@@ -441,6 +441,42 @@ router.get('/highlights', async (req, res) => {
       }
     }
     
+    // Get all games for this week to check player game status
+    // This is needed to filter out players who haven't played yet
+    const allGames = await Game.find({
+      season: currentSeason,
+      week: currentWeek
+    }).lean();
+    
+    // Create a map of team abbreviation to game status
+    const teamGameStatusMap = new Map();
+    allGames.forEach(game => {
+      if (game.homeTeam?.abbreviation && game.status) {
+        teamGameStatusMap.set(game.homeTeam.abbreviation, {
+          status: game.status,
+          isLive: game.isLive || false
+        });
+      }
+      if (game.awayTeam?.abbreviation && game.status) {
+        teamGameStatusMap.set(game.awayTeam.abbreviation, {
+          status: game.status,
+          isLive: game.isLive || false
+        });
+      }
+    });
+    
+    // Helper function to check if a player's game has been played
+    const hasPlayerPlayed = (proTeamId) => {
+      if (!proTeamId) return false;
+      const gameStatus = teamGameStatusMap.get(proTeamId);
+      if (!gameStatus) return false;
+      // Only include players whose games are final, in progress, or at halftime
+      // Exclude scheduled/pre games
+      return gameStatus.status === 'STATUS_FINAL' || 
+             gameStatus.status === 'STATUS_IN' || 
+             gameStatus.status === 'STATUS_HALFTIME';
+    };
+    
     // Get all players to find top scorers and booms
     const allPlayers = await ESPNPlayer.find({}).lean();
     if (process.env.NODE_ENV === 'development') {
@@ -475,18 +511,21 @@ router.get('/highlights', async (req, res) => {
         const points = weekData.ppr || weekData.half || weekData.std;
         
         if (points && points > 0) {
-          playersWithData++;
-          topScorers.push({
-            espn_id: player.espn_id,
-            name: player.name,
-            position: player.position,
-            pro_team_id: player.pro_team_id,
-            headshot_url: player.headshot_url,
-            week: currentWeek,
-            points: points,
-            roster_status: player.roster_status || 'unknown',
-            fantasy_team_name: player.fantasy_team_name || null
-          });
+          // Only include players whose games have been played (final, in progress, or halftime)
+          if (hasPlayerPlayed(player.pro_team_id)) {
+            playersWithData++;
+            topScorers.push({
+              espn_id: player.espn_id,
+              name: player.name,
+              position: player.position,
+              pro_team_id: player.pro_team_id,
+              headshot_url: player.headshot_url,
+              week: currentWeek,
+              points: points,
+              roster_status: player.roster_status || 'unknown',
+              fantasy_team_name: player.fantasy_team_name || null
+            });
+          }
         }
       }
       
@@ -543,6 +582,11 @@ router.get('/highlights', async (req, res) => {
           const isHomeTeam = player.pro_team_id === game.homeTeam.abbreviation;
           
           if (isAwayTeam || isHomeTeam) {
+            // Only include players whose games have been played
+            if (!hasPlayerPlayed(player.pro_team_id)) {
+              continue;
+            }
+            
             const weekData = weeklyActuals[game.week.toString()];
             if (weekData && typeof weekData === 'object') {
               const points = weekData.ppr || weekData.half || weekData.std;
@@ -613,6 +657,11 @@ router.get('/highlights', async (req, res) => {
         const projPoints = projData.ppr || projData.half || projData.std;
         
         if (actualPoints && projPoints) {
+          // Only include players whose games have been played (final, in progress, or halftime)
+          if (!hasPlayerPlayed(player.pro_team_id)) {
+            continue;
+          }
+          
           const diff = actualPoints - projPoints;
           const percentage = (diff / projPoints) * 100;
           
@@ -676,6 +725,11 @@ router.get('/highlights', async (req, res) => {
         const projPoints = projData.ppr || projData.half || projData.std;
         
         if (actualPoints !== null && projPoints !== null && projPoints > 10) {
+          // Only include players whose games have been played (final, in progress, or halftime)
+          if (!hasPlayerPlayed(player.pro_team_id)) {
+            continue;
+          }
+          
           const diff = actualPoints - projPoints;
           const percentage = (diff / projPoints) * 100;
           
@@ -1173,55 +1227,90 @@ router.get('/week/:week', async (req, res) => {
     const { week } = req.params;
     const { season, realtime } = req.query;
     
-    const currentSeason = season || new Date().getFullYear();
+    const currentSeason = season ? parseInt(season) : new Date().getFullYear();
     const weekNum = parseInt(week);
     
-    // If realtime parameter is true, fetch from ESPN API directly
-    if (realtime === 'true') {
-      console.log(`Fetching games for week ${weekNum}, season ${currentSeason} from ESPN API in real-time`);
-      
-      const games = await espnService.fetchScoreboard(weekNum, parseInt(currentSeason));
-      
-      // Transform games to match expected format
-      const gameSummaries = games.map(game => ({
-        eventId: game.eventId,
-        week: game.week,
-        season: game.season,
-        status: game.status,
-        period: game.period,
-        clock: game.clock,
-        score: game.score,
-        homeTeam: {
-          abbreviation: game.homeTeam.abbreviation,
-          name: game.homeTeam.name,
-          score: game.homeTeam.score,
-          logo: game.homeTeam.logo
-        },
-        awayTeam: {
-          abbreviation: game.awayTeam.abbreviation,
-          name: game.awayTeam.name,
-          score: game.awayTeam.score,
-          logo: game.awayTeam.logo
-        },
-        isLive: game.isLive,
-        date: game.date,
-        venue: game.venue
-      }));
-      
-      return res.json({
-        success: true,
-        count: gameSummaries.length,
-        week: weekNum,
-        season: parseInt(currentSeason),
-        games: gameSummaries,
-        realtime: true
-      });
-    }
-    
-    // Otherwise, fetch from database
-    const games = await Game.findByWeek(weekNum, parseInt(currentSeason))
-      .select('eventId week season status period clock score homeTeam awayTeam isLive date venue')
+    // Try database first (faster), then fallback to real-time if needed
+    let games = await Game.findByWeek(weekNum, currentSeason)
+      .select('eventId week season status period clock score homeTeam awayTeam isLive date venue lastUpdated')
+      .sort({ date: 1 })
       .lean();
+    
+    // If realtime is requested OR we have no games OR games are stale (older than 2 minutes for live games)
+    const needsRefresh = realtime === 'true' || 
+      games.length === 0 || 
+      (games.some(g => g.isLive && g.lastUpdated && (Date.now() - new Date(g.lastUpdated).getTime() > 120000)));
+    
+    if (needsRefresh) {
+      console.log(`Fetching games for week ${weekNum}, season ${currentSeason} from ESPN API (realtime=${realtime === 'true'}, needsRefresh=${needsRefresh})`);
+      
+      try {
+        const liveGames = await espnService.fetchScoreboard(weekNum, currentSeason);
+        
+        // Transform and update database
+        const gameSummaries = await Promise.all(liveGames.map(async (game) => {
+          // Upsert to database for faster future queries
+          await Game.findOneAndUpdate(
+            { eventId: game.eventId },
+            {
+              eventId: game.eventId,
+              week: game.week,
+              season: game.season,
+              status: game.status,
+              period: game.period,
+              clock: game.clock,
+              score: game.score,
+              homeTeam: game.homeTeam,
+              awayTeam: game.awayTeam,
+              isLive: game.isLive,
+              date: game.date,
+              venue: game.venue,
+              lastUpdated: new Date(),
+              dataHash: `${game.eventId}-${game.status}-${game.homeTeam.score}-${game.awayTeam.score}`
+            },
+            { upsert: true, new: true }
+          );
+          
+          return {
+            eventId: game.eventId,
+            week: game.week,
+            season: game.season,
+            status: game.status,
+            period: game.period,
+            clock: game.clock,
+            score: game.score,
+            homeTeam: {
+              abbreviation: game.homeTeam.abbreviation,
+              name: game.homeTeam.name,
+              score: game.homeTeam.score,
+              logo: game.homeTeam.logo
+            },
+            awayTeam: {
+              abbreviation: game.awayTeam.abbreviation,
+              name: game.awayTeam.name,
+              score: game.awayTeam.score,
+              logo: game.awayTeam.logo
+            },
+            isLive: game.isLive,
+            date: game.date,
+            venue: game.venue
+          };
+        }));
+        
+        return res.json({
+          success: true,
+          count: gameSummaries.length,
+          week: weekNum,
+          season: currentSeason,
+          games: gameSummaries,
+          realtime: true,
+          cached: false
+        });
+      } catch (apiError) {
+        console.error('Error fetching from ESPN API, falling back to database:', apiError.message);
+        // Fall through to return database results
+      }
+    }
 
     const gameSummaries = games.map(game => ({
       eventId: game.eventId,

@@ -31,7 +31,8 @@ export const teamLogos: Record<string, string> = {
   'SEA': 'https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/sea.png',
   'TB': 'https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/tb.png',
   'TEN': 'https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/ten.png',
-  'WAS': 'https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/was.png'
+  'WAS': 'https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/wsh.png',
+  'WSH': 'https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/wsh.png'
 }
 
 // Function to get team logo URL
@@ -41,5 +42,17 @@ export const getTeamLogo = (teamAbbreviation: string): string | null => {
 
 // Function to get team logo with fallback
 export const getTeamLogoWithFallback = (teamAbbreviation: string): string => {
-  return teamLogos[teamAbbreviation] || `https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/${teamAbbreviation.toLowerCase()}.png`
+  // Check direct mapping first
+  if (teamLogos[teamAbbreviation]) {
+    return teamLogos[teamAbbreviation]
+  }
+  
+  // Handle special cases
+  const normalized = teamAbbreviation.toUpperCase()
+  if (normalized === 'WAS') {
+    return 'https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/wsh.png'
+  }
+  
+  // Default fallback
+  return `https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/${teamAbbreviation.toLowerCase()}.png`
 }

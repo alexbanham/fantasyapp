@@ -1972,4 +1972,141 @@ router.get('/analytics/team/:teamId/weekly-breakdown', async (req, res) => {
     });
   }
 });
+
+// Get waiver wire analysis - points left on waivers each week
+router.get('/analytics/waiver-wire', async (req, res) => {
+  try {
+    const { seasonId, week } = req.query;
+    const config = await Config.getConfig();
+    const season = seasonId || config.currentSeason || 2025;
+    const requestedWeek = week ? parseInt(week) : null;
+    const leagueId = parseInt(process.env.ESPN_LEAGUE_ID);
+    
+    const ESPNPlayer = require('../models/ESPNPlayer');
+    
+    // Get all players who have weekly actuals for the requested week(s)
+    const weekQuery = requestedWeek ? { [`weekly_actuals.${requestedWeek}`]: { $exists: true } } : {};
+    const allPlayers = await ESPNPlayer.find(weekQuery).lean();
+    
+    // Get all rostered players from WeeklyPlayerLine for the requested week(s)
+    const rosterQuery = { league_id: leagueId, season };
+    if (requestedWeek) {
+      rosterQuery.week = requestedWeek;
+    }
+    const rosteredPlayers = await WeeklyPlayerLine.find(rosterQuery).lean();
+    
+    // Create a map of week -> set of rostered player IDs for quick lookup
+    const rosteredPlayersByWeek = new Map();
+    rosteredPlayers.forEach(rp => {
+      if (!rosteredPlayersByWeek.has(rp.week)) {
+        rosteredPlayersByWeek.set(rp.week, new Set());
+      }
+      rosteredPlayersByWeek.get(rp.week).add(rp.player_id);
+    });
+    
+    // Process players to find waiver wire players
+    const waiverWireData = new Map(); // week -> { players: [], totalPoints: 0 }
+    
+    allPlayers.forEach(player => {
+      // Handle weekly_actuals as Map or Object
+      let weeklyActuals = player.weekly_actuals || {};
+      if (weeklyActuals instanceof Map) {
+        weeklyActuals = Object.fromEntries(weeklyActuals);
+      }
+      
+      // Check each week
+      Object.keys(weeklyActuals).forEach(weekStr => {
+        const weekNum = parseInt(weekStr);
+        if (isNaN(weekNum)) return;
+        
+        // Skip if we're filtering by week and this isn't it
+        if (requestedWeek && weekNum !== requestedWeek) return;
+        
+        // Check if player was rostered this specific week
+        const weekRosteredPlayers = rosteredPlayersByWeek.get(weekNum);
+        if (weekRosteredPlayers && weekRosteredPlayers.has(player.espn_id)) {
+          return; // Player was rostered this week, skip
+        }
+        
+        // Get points for this week (prefer PPR, fallback to other scoring types)
+        const weekData = weeklyActuals[weekStr];
+        const points = weekData?.ppr || weekData?.half || weekData?.std || 0;
+        
+        // Only include players who actually scored points
+        if (points > 0) {
+          if (!waiverWireData.has(weekNum)) {
+            waiverWireData.set(weekNum, {
+              week: weekNum,
+              players: [],
+              totalPoints: 0
+            });
+          }
+          
+          const weekDataObj = waiverWireData.get(weekNum);
+          weekDataObj.players.push({
+            playerId: player.espn_id,
+            name: player.name || `${player.first_name || ''} ${player.last_name || ''}`.trim() || `Player ${player.espn_id}`,
+            position: player.position || 'UNK',
+            points: Math.round(points * 10) / 10,
+            proTeamId: player.pro_team_id || null
+          });
+          weekDataObj.totalPoints += points;
+        }
+      });
+    });
+    
+    // Sort players by points descending for each week
+    waiverWireData.forEach(weekData => {
+      weekData.players.sort((a, b) => b.points - a.points);
+      weekData.totalPoints = Math.round(weekData.totalPoints * 10) / 10;
+    });
+    
+    // Convert to array and sort by week
+    const weeklyBreakdown = Array.from(waiverWireData.values())
+      .sort((a, b) => a.week - b.week)
+      .map(weekData => ({
+        week: weekData.week,
+        totalPoints: weekData.totalPoints,
+        playerCount: weekData.players.length,
+        topPlayers: weekData.players.slice(0, 10), // Top 10 per week
+        significantScores: weekData.players.filter(p => p.points >= 15) // Scores >= 15 points
+      }));
+    
+    // Calculate season totals
+    const seasonTotals = {
+      totalPoints: weeklyBreakdown.reduce((sum, w) => sum + w.totalPoints, 0),
+      totalPlayers: weeklyBreakdown.reduce((sum, w) => sum + w.playerCount, 0),
+      avgPointsPerWeek: weeklyBreakdown.length > 0 
+        ? weeklyBreakdown.reduce((sum, w) => sum + w.totalPoints, 0) / weeklyBreakdown.length 
+        : 0,
+      significantScoresCount: weeklyBreakdown.reduce((sum, w) => sum + w.significantScores.length, 0)
+    };
+    
+    // Get all significant scores across all weeks (sorted)
+    const allSignificantScores = weeklyBreakdown
+      .flatMap(w => w.significantScores.map(s => ({ ...s, week: w.week })))
+      .sort((a, b) => b.points - a.points);
+    
+    res.json({
+      success: true,
+      season,
+      week: requestedWeek || 'all',
+      seasonTotals: {
+        totalPoints: Math.round(seasonTotals.totalPoints * 10) / 10,
+        totalPlayers: seasonTotals.totalPlayers,
+        avgPointsPerWeek: Math.round(seasonTotals.avgPointsPerWeek * 10) / 10,
+        significantScoresCount: seasonTotals.significantScoresCount
+      },
+      weeklyBreakdown,
+      topSignificantScores: allSignificantScores.slice(0, 20) // Top 20 significant scores overall
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch waiver wire analysis',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

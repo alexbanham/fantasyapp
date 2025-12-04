@@ -144,6 +144,10 @@ gameSchema.index({ week: 1, season: 1 });
 gameSchema.index({ status: 1, isLive: 1 });
 gameSchema.index({ date: 1 });
 gameSchema.index({ 'homeTeam.abbreviation': 1, 'awayTeam.abbreviation': 1 });
+// Compound index for standings queries (most common query pattern)
+gameSchema.index({ season: 1, status: 1 });
+// Index for finding latest game updates
+gameSchema.index({ season: 1, lastUpdated: -1 });
 
 // Virtual for game summary
 gameSchema.virtual('summary').get(function() {

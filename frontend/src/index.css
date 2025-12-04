@@ -58,10 +58,10 @@
   /* Purple Scheme */
   .purple-scheme {
     --primary: 270 100% 70%;
-    --primary-foreground: 0 0% 9%;
+    --primary-foreground: 0 0% 0%;
     --accent: 270 50% 20%;
     --accent-foreground: 0 0% 98%;
-    --border: 270 20% 20%;
+    --border: 270 20% 30%;
     --ring: 270 100% 70%;
   }
 
@@ -78,10 +78,10 @@
   /* Eagles Scheme */
   .eagles-scheme {
     --primary: 25 100% 50%;
-    --primary-foreground: 0 0% 9%;
+    --primary-foreground: 0 0% 0%;
     --accent: 25 50% 20%;
     --accent-foreground: 0 0% 98%;
-    --border: 25 20% 20%;
+    --border: 25 20% 30%;
     --ring: 25 100% 50%;
   }
 
@@ -91,7 +91,7 @@
     --primary-foreground: 0 0% 98%;
     --accent: 210 50% 20%;
     --accent-foreground: 0 0% 98%;
-    --border: 210 20% 20%;
+    --border: 210 20% 30%;
     --ring: 210 100% 30%;
   }
 
@@ -101,7 +101,7 @@
     --primary-foreground: 0 0% 98%;
     --accent: 0 50% 20%;
     --accent-foreground: 0 0% 98%;
-    --border: 0 20% 20%;
+    --border: 0 20% 30%;
     --ring: 0 100% 33%;
   }
 
@@ -111,8 +111,168 @@
     --primary-foreground: 0 0% 0%;
     --accent: 210 100% 30%;
     --accent-foreground: 0 0% 98%;
-    --border: 210 20% 20%;
+    --border: 210 20% 30%;
     --ring: 38 100% 50%;
+  }
+
+  /* Christmas Scheme */
+  .christmas-scheme {
+    --primary: 0 84% 50%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 0 0% 98%;
+    --border: 142 30% 35%;
+    --ring: 0 84% 50%;
+  }
+
+  /* Chiefs Scheme */
+  .chiefs-scheme {
+    --primary: 0 88% 50%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 45 100% 55%;
+    --accent-foreground: 0 0% 0%;
+    --border: 0 20% 30%;
+    --ring: 0 88% 50%;
+  }
+
+  /* Packers Scheme */
+  .packers-scheme {
+    --primary: 142 100% 20%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 45 100% 55%;
+    --accent-foreground: 0 0% 0%;
+    --border: 142 30% 35%;
+    --ring: 142 100% 20%;
+  }
+
+  /* Steelers Scheme */
+  .steelers-scheme {
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 45 100% 55%;
+    --accent-foreground: 0 0% 0%;
+    --border: 0 0% 30%;
+    --ring: 45 100% 55%;
+  }
+
+  /* Raiders Scheme */
+  .raiders-scheme {
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 210 10% 65%;
+    --accent-foreground: 0 0% 0%;
+    --border: 0 0% 30%;
+    --ring: 210 10% 65%;
+  }
+
+  /* Dolphins Scheme */
+  .dolphins-scheme {
+    --primary: 185 100% 30%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 15 98% 50%;
+    --accent-foreground: 0 0% 0%;
+    --border: 185 30% 35%;
+    --ring: 185 100% 30%;
+  }
+
+  /* Bills Scheme */
+  .bills-scheme {
+    --primary: 210 100% 28%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 0 90% 40%;
+    --accent-foreground: 0 0% 98%;
+    --border: 210 30% 35%;
+    --ring: 210 100% 28%;
+  }
+
+  /* Ravens Scheme */
+  .ravens-scheme {
+    --primary: 250 70% 28%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 0 0% 0%;
+    --accent-foreground: 0 0% 98%;
+    --border: 250 30% 35%;
+    --ring: 250 70% 28%;
+  }
+
+  /* Seahawks Scheme */
+  .seahawks-scheme {
+    --primary: 210 100% 13%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 95 70% 45%;
+    --accent-foreground: 0 0% 0%;
+    --border: 210 30% 35%;
+    --ring: 95 70% 45%;
+  }
+
+  /* Broncos Scheme */
+  .broncos-scheme {
+    --primary: 15 97% 53%;
+    --primary-foreground: 0 0% 0%;
+    --accent: 210 100% 13%;
+    --accent-foreground: 0 0% 98%;
+    --border: 15 30% 35%;
+    --ring: 15 97% 53%;
+  }
+
+  /* Saints Scheme */
+  .saints-scheme {
+    --primary: 45 40% 70%;
+    --primary-foreground: 0 0% 0%;
+    --accent: 0 0% 0%;
+    --accent-foreground: 0 0% 98%;
+    --border: 0 0% 30%;
+    --ring: 45 40% 70%;
+  }
+
+  /* Buccaneers Scheme */
+  .bucs-scheme {
+    --primary: 0 90% 45%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 30 100% 50%;
+    --accent-foreground: 0 0% 0%;
+    --border: 0 20% 30%;
+    --ring: 0 90% 45%;
+  }
+
+  /* Titans Scheme */
+  .titans-scheme {
+    --primary: 210 100% 13%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 200 70% 55%;
+    --accent-foreground: 0 0% 0%;
+    --border: 210 30% 35%;
+    --ring: 200 70% 55%;
+  }
+
+  /* Chargers Scheme */
+  .chargers-scheme {
+    --primary: 200 100% 39%;
+    --primary-foreground: 0 0% 0%;
+    --accent: 45 100% 54%;
+    --accent-foreground: 0 0% 0%;
+    --border: 200 30% 35%;
+    --ring: 200 100% 39%;
+  }
+
+  /* Patriots Scheme */
+  .patriots-scheme {
+    --primary: 210 100% 13%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 0 90% 40%;
+    --accent-foreground: 0 0% 98%;
+    --border: 210 30% 35%;
+    --ring: 210 100% 13%;
+  }
+
+  /* Syracuse Orange Scheme */
+  .syracuse-scheme {
+    --primary: 15 100% 50%;
+    --primary-foreground: 0 0% 98%;
+    --accent: 15 80% 30%;
+    --accent-foreground: 0 0% 98%;
+    --border: 15 30% 40%;
+    --ring: 15 100% 50%;
   }
 }
 
@@ -122,6 +282,62 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+  }
+  
+  /* Font Family Classes */
+  .font-inter {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  
+  .font-montserrat {
+    font-family: 'Montserrat', system-ui, sans-serif;
+  }
+  
+  .font-roboto {
+    font-family: 'Roboto', system-ui, sans-serif;
+  }
+  
+  .font-poppins {
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+  
+  .font-overpass {
+    font-family: 'Overpass', system-ui, sans-serif;
+  }
+  
+  .font-open-sans {
+    font-family: 'Open Sans', system-ui, sans-serif;
+  }
+  
+  /* Apply font to html element when font class is set */
+  html.font-inter,
+  html.font-inter body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  
+  html.font-montserrat,
+  html.font-montserrat body {
+    font-family: 'Montserrat', system-ui, sans-serif;
+  }
+  
+  html.font-roboto,
+  html.font-roboto body {
+    font-family: 'Roboto', system-ui, sans-serif;
+  }
+  
+  html.font-poppins,
+  html.font-poppins body {
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+  
+  html.font-overpass,
+  html.font-overpass body {
+    font-family: 'Overpass', system-ui, sans-serif;
+  }
+  
+  html.font-open-sans,
+  html.font-open-sans body {
+    font-family: 'Open Sans', system-ui, sans-serif;
   }
 }
 
@@ -155,6 +371,69 @@
   }
   100% {
     background-position: calc(200px + 100%) 0;
+  }
+}
+
+@keyframes orbit {
+  0% {
+    transform: rotate(0deg) translateX(16px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(16px) rotate(-360deg);
+  }
+}
+
+@keyframes orbitReverse {
+  0% {
+    transform: rotate(0deg) translateX(14px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(-360deg) translateX(14px) rotate(360deg);
+  }
+}
+
+@keyframes orbitSlow {
+  0% {
+    transform: rotate(0deg) translateX(12px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(12px) rotate(-360deg);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-8px) translateX(4px);
+    opacity: 1;
+  }
+}
+
+@keyframes floatVertical {
+  0%, 100% {
+    transform: translateY(0px);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-6px);
+    opacity: 0.8;
+  }
+}
+
+@keyframes snowfall {
+  0% {
+    transform: translateY(-100%) translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(50vh) translateX(var(--snowflake-drift, 0px)) rotate(180deg);
+  }
+  100% {
+    transform: translateY(100vh) translateX(calc(var(--snowflake-drift, 0px) * 2)) rotate(360deg);
+    opacity: 0;
   }
 }
 
@@ -226,6 +505,14 @@
   background: linear-gradient(to bottom right, #003594, #FFA300, #003594);
 }
 
+.christmas-scheme {
+  background: linear-gradient(to bottom right, #1a1a1a, #0f5132, #7f1d1d);
+}
+
+.christmas-scheme body {
+  background: linear-gradient(to bottom right, #1a1a1a, #0f5132, #7f1d1d);
+}
+
 /* Color Scheme Glass Effects */
 .purple-scheme .glass {
   background: rgba(88, 28, 135, 0.05);
@@ -255,6 +542,199 @@
 .rams-scheme .glass {
   background: rgba(0, 53, 148, 0.05);
   border: 1px solid rgba(255, 163, 0, 0.1);
+}
+
+.christmas-scheme .glass {
+  background: rgba(220, 38, 38, 0.05);
+  border: 1px solid rgba(22, 163, 74, 0.1);
+}
+
+.chiefs-scheme {
+  background: linear-gradient(to bottom right, #1a0000, #E31837, #000000);
+}
+
+.chiefs-scheme body {
+  background: linear-gradient(to bottom right, #1a0000, #E31837, #000000);
+}
+
+.packers-scheme {
+  background: linear-gradient(to bottom right, #0a1f18, #203731, #0a1f18);
+}
+
+.packers-scheme body {
+  background: linear-gradient(to bottom right, #0a1f18, #203731, #0a1f18);
+}
+
+.steelers-scheme {
+  background: linear-gradient(to bottom right, #000000, #1a1a1a, #000000);
+}
+
+.steelers-scheme body {
+  background: linear-gradient(to bottom right, #000000, #1a1a1a, #000000);
+}
+
+.raiders-scheme {
+  background: linear-gradient(to bottom right, #000000, #2a2a2a, #000000);
+}
+
+.raiders-scheme body {
+  background: linear-gradient(to bottom right, #000000, #2a2a2a, #000000);
+}
+
+.dolphins-scheme {
+  background: linear-gradient(to bottom right, #001a1c, #008E97, #001a1c);
+}
+
+.dolphins-scheme body {
+  background: linear-gradient(to bottom right, #001a1c, #008E97, #001a1c);
+}
+
+.bills-scheme {
+  background: linear-gradient(to bottom right, #000d1a, #00338D, #000d1a);
+}
+
+.bills-scheme body {
+  background: linear-gradient(to bottom right, #000d1a, #00338D, #000d1a);
+}
+
+.ravens-scheme {
+  background: linear-gradient(to bottom right, #0a0a1a, #241773, #000000);
+}
+
+.ravens-scheme body {
+  background: linear-gradient(to bottom right, #0a0a1a, #241773, #000000);
+}
+
+.seahawks-scheme {
+  background: linear-gradient(to bottom right, #000d1a, #002244, #000d1a);
+}
+
+.seahawks-scheme body {
+  background: linear-gradient(to bottom right, #000d1a, #002244, #000d1a);
+}
+
+.broncos-scheme {
+  background: linear-gradient(to bottom right, #1a0a00, #FB4F14, #000d1a);
+}
+
+.broncos-scheme body {
+  background: linear-gradient(to bottom right, #1a0a00, #FB4F14, #000d1a);
+}
+
+.saints-scheme {
+  background: linear-gradient(to bottom right, #000000, #1a1a1a, #000000);
+}
+
+.saints-scheme body {
+  background: linear-gradient(to bottom right, #000000, #1a1a1a, #000000);
+}
+
+.bucs-scheme {
+  background: linear-gradient(to bottom right, #1a0000, #D50A0A, #1a0000);
+}
+
+.bucs-scheme body {
+  background: linear-gradient(to bottom right, #1a0000, #D50A0A, #1a0000);
+}
+
+.titans-scheme {
+  background: linear-gradient(to bottom right, #000d1a, #0C2340, #000d1a);
+}
+
+.titans-scheme body {
+  background: linear-gradient(to bottom right, #000d1a, #0C2340, #000d1a);
+}
+
+.chargers-scheme {
+  background: linear-gradient(to bottom right, #001a26, #0080C6, #001a26);
+}
+
+.chargers-scheme body {
+  background: linear-gradient(to bottom right, #001a26, #0080C6, #001a26);
+}
+
+.patriots-scheme {
+  background: linear-gradient(to bottom right, #000d1a, #002244, #000d1a);
+}
+
+.patriots-scheme body {
+  background: linear-gradient(to bottom right, #000d1a, #002244, #000d1a);
+}
+
+/* Color Scheme Glass Effects */
+.chiefs-scheme .glass {
+  background: rgba(227, 24, 55, 0.05);
+  border: 1px solid rgba(255, 184, 28, 0.1);
+}
+
+.packers-scheme .glass {
+  background: rgba(32, 55, 49, 0.05);
+  border: 1px solid rgba(255, 182, 18, 0.1);
+}
+
+.steelers-scheme .glass {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 182, 18, 0.1);
+}
+
+.raiders-scheme .glass {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(165, 172, 175, 0.1);
+}
+
+.dolphins-scheme .glass {
+  background: rgba(0, 142, 151, 0.05);
+  border: 1px solid rgba(252, 76, 2, 0.1);
+}
+
+.bills-scheme .glass {
+  background: rgba(0, 51, 141, 0.05);
+  border: 1px solid rgba(198, 12, 48, 0.1);
+}
+
+.ravens-scheme .glass {
+  background: rgba(36, 23, 115, 0.05);
+  border: 1px solid rgba(158, 124, 12, 0.1);
+}
+
+.seahawks-scheme .glass {
+  background: rgba(0, 34, 68, 0.05);
+  border: 1px solid rgba(105, 190, 40, 0.1);
+}
+
+.broncos-scheme .glass {
+  background: rgba(251, 79, 20, 0.05);
+  border: 1px solid rgba(0, 34, 68, 0.1);
+}
+
+.saints-scheme .glass {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(211, 188, 141, 0.1);
+}
+
+.bucs-scheme .glass {
+  background: rgba(213, 10, 10, 0.05);
+  border: 1px solid rgba(255, 121, 0, 0.1);
+}
+
+.titans-scheme .glass {
+  background: rgba(12, 35, 64, 0.05);
+  border: 1px solid rgba(75, 146, 219, 0.1);
+}
+
+.chargers-scheme .glass {
+  background: rgba(0, 128, 198, 0.05);
+  border: 1px solid rgba(255, 194, 14, 0.1);
+}
+
+.patriots-scheme .glass {
+  background: rgba(0, 34, 68, 0.05);
+  border: 1px solid rgba(198, 12, 48, 0.1);
+}
+
+.syracuse-scheme .glass {
+  background: rgba(255, 107, 53, 0.05);
+  border: 1px solid rgba(255, 107, 53, 0.1);
 }
 
 /* News article image styles - ensure crisp rendering */

@@ -228,3 +228,7 @@ From The Odds API documentation, player props come in this format:
 - [GET odds endpoint](https://the-odds-api.com/liveapi/guides/v4/#get-odds) - Main endpoint for fetching odds
 - Credit cost formula: `cost = 10 × [markets] × [regions]`
 
+
+
+
+

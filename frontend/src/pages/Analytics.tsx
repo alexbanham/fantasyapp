@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, Trophy, AlertCircle, RefreshCw, X, ChevronRight, ChevronDown } from 'lucide-react'
+import { TrendingUp, Trophy, AlertCircle, RefreshCw, X, ChevronRight, ChevronDown, Users, TrendingDown } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
-import { getManagerScores, ManagerScore, getTeamWeeklyBreakdown, WeeklyBreakdownResponse } from '../services/api'
+import { getManagerScores, ManagerScore, getTeamWeeklyBreakdown, WeeklyBreakdownResponse, getWaiverWireAnalysis, WaiverWireAnalysis } from '../services/api'
 
 const Analytics = () => {
   const [managerScores, setManagerScores] = useState<ManagerScore[]>([])
@@ -14,9 +14,13 @@ const Analytics = () => {
   const [weeklyBreakdown, setWeeklyBreakdown] = useState<WeeklyBreakdownResponse | null>(null)
   const [loadingBreakdown, setLoadingBreakdown] = useState(false)
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set())
+  const [waiverWireData, setWaiverWireData] = useState<WaiverWireAnalysis | null>(null)
+  const [loadingWaiverWire, setLoadingWaiverWire] = useState(false)
+  const [expandedWaiverWeeks, setExpandedWaiverWeeks] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     fetchAnalytics()
+    fetchWaiverWireAnalysis()
   }, [season])
 
   const fetchAnalytics = async () => {
@@ -34,6 +38,30 @@ const Analytics = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchWaiverWireAnalysis = async () => {
+    try {
+      setLoadingWaiverWire(true)
+      const data = await getWaiverWireAnalysis(season, null)
+      if (data.success) {
+        setWaiverWireData(data)
+      }
+    } catch (err) {
+      console.error('Failed to load waiver wire analysis:', err)
+    } finally {
+      setLoadingWaiverWire(false)
+    }
+  }
+
+  const toggleWaiverWeekExpansion = (week: number) => {
+    const newExpanded = new Set(expandedWaiverWeeks)
+    if (newExpanded.has(week)) {
+      newExpanded.delete(week)
+    } else {
+      newExpanded.add(week)
+    }
+    setExpandedWaiverWeeks(newExpanded)
   }
 
   const handleTeamClick = async (teamId: number, teamName: string) => {
@@ -219,7 +247,10 @@ const Analytics = () => {
             </div>
             <div className="flex items-center space-x-2">
               <Badge variant="outline">{season} Season Totals</Badge>
-              <Button variant="ghost" size="sm" onClick={fetchAnalytics}>
+              <Button variant="ghost" size="sm" onClick={() => {
+                fetchAnalytics()
+                fetchWaiverWireAnalysis()
+              }}>
                 <RefreshCw className="h-4 w-4" />
               </Button>
             </div>
@@ -304,6 +335,170 @@ const Analytics = () => {
               </Card>
             ))}
           </div>
+        </div>
+
+        {/* Waiver Wire Analysis Section */}
+        <div className="mb-8">
+          <div className="flex items-center space-x-2 mb-4">
+            <Users className="h-5 w-5 text-primary" />
+            <h2 className="text-2xl font-semibold text-foreground">Waiver Wire Analysis</h2>
+          </div>
+
+          {loadingWaiverWire ? (
+            <div className="flex items-center justify-center p-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">Loading waiver wire analysis...</span>
+            </div>
+          ) : waiverWireData ? (
+            <>
+              {/* Season Totals */}
+              <Card className="p-6 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Total Points on Waivers</div>
+                    <div className="text-2xl font-bold text-red-500">
+                      {formatScore(waiverWireData.seasonTotals.totalPoints)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Avg Per Week</div>
+                    <div className="text-2xl font-bold text-orange-500">
+                      {formatScore(waiverWireData.seasonTotals.avgPointsPerWeek)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Total Players</div>
+                    <div className="text-2xl font-bold text-foreground">
+                      {waiverWireData.seasonTotals.totalPlayers}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Significant Scores (15+ pts)</div>
+                    <div className="text-2xl font-bold text-yellow-500">
+                      {waiverWireData.seasonTotals.significantScoresCount}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Top Significant Scores */}
+              {waiverWireData.topSignificantScores.length > 0 && (
+                <Card className="p-6 mb-6">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <TrendingDown className="h-5 w-5 text-yellow-500" />
+                    <h3 className="text-lg font-semibold">Top Significant Waiver Wire Scores</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {waiverWireData.topSignificantScores.map((score, idx) => (
+                      <div 
+                        key={`${score.playerId}-${score.week}`}
+                        className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Badge variant="outline" className="w-8 text-center">
+                            {idx + 1}
+                          </Badge>
+                          <div>
+                            <div className="font-semibold text-foreground">{score.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {score.position} • Week {score.week}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-xl font-bold text-yellow-600">
+                          {formatScore(score.points)} pts
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Weekly Breakdown */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold mb-3">Weekly Breakdown</h3>
+                {waiverWireData.weeklyBreakdown.map((week) => (
+                  <Card key={week.week} className="overflow-hidden">
+                    <button
+                      onClick={() => toggleWaiverWeekExpansion(week.week)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors text-left"
+                    >
+                      <div className="flex items-center space-x-4">
+                        {expandedWaiverWeeks.has(week.week) ? (
+                          <ChevronDown className="h-5 w-5" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5" />
+                        )}
+                        <div className="font-semibold">Week {week.week}</div>
+                        <div className="flex items-center space-x-4 text-sm">
+                          <span className="text-muted-foreground">
+                            Total: <span className="font-semibold text-red-500">{formatScore(week.totalPoints)} pts</span>
+                          </span>
+                          <span className="text-muted-foreground">
+                            Players: <span className="font-semibold">{week.playerCount}</span>
+                          </span>
+                          {week.significantScores.length > 0 && (
+                            <Badge variant="secondary">
+                              {week.significantScores.length} significant scores
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+
+                    {expandedWaiverWeeks.has(week.week) && (
+                      <div className="p-4 border-t bg-accent/20">
+                        <div className="mb-4">
+                          <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Top 10 Players</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                            {week.topPlayers.map((player, idx) => (
+                              <div 
+                                key={player.playerId}
+                                className="flex items-center justify-between p-2 bg-background rounded border"
+                              >
+                                <div className="flex items-center space-x-2 truncate">
+                                  <span className="text-xs text-muted-foreground w-6">{idx + 1}.</span>
+                                  <div className="truncate">
+                                    <div className="text-sm font-medium truncate">{player.name}</div>
+                                    <div className="text-xs text-muted-foreground">{player.position}</div>
+                                  </div>
+                                </div>
+                                <span className="font-semibold ml-2">{formatScore(player.points)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {week.significantScores.length > 0 && (
+                          <div>
+                            <h4 className="font-semibold mb-2 text-sm text-yellow-600">Significant Scores (15+ pts)</h4>
+                            <div className="space-y-2">
+                              {week.significantScores.map((player) => (
+                                <div 
+                                  key={player.playerId}
+                                  className="flex items-center justify-between p-2 bg-yellow-500/10 rounded border border-yellow-500/20"
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-sm font-medium">{player.name}</span>
+                                    <Badge variant="outline" className="text-xs">{player.position}</Badge>
+                                  </div>
+                                  <span className="font-bold text-yellow-600">{formatScore(player.points)} pts</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            </>
+          ) : (
+            <Card className="p-8 text-center">
+              <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">No waiver wire data available</p>
+            </Card>
+          )}
         </div>
 
         {/* Weekly Breakdown Modal */}

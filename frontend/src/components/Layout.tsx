@@ -6,7 +6,6 @@ import {
   Home,
   Search,
   Calendar,
-  Crown,
   Database,
   Settings,
   Trophy,
@@ -16,6 +15,8 @@ import {
 } from 'lucide-react'
 import { Button } from './ui/button'
 import ColorSchemeToggler from './ColorSchemeToggler'
+import AnimatedLogo from './AnimatedLogo'
+import AnimatedLogoText from './AnimatedLogoText'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -59,13 +60,13 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
           onClick={() => setSidebarOpen(false)} 
         />
         {/* Sidebar Panel - Mobile only */}
-        <div className={`fixed inset-y-0 left-0 w-64 glass border-r border-border/30 shadow-xl transition-transform duration-300 ease-in-out lg:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <div className="flex items-center justify-between p-4 border-b border-border/30 glass">
-            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-              <div className="w-8 h-8 flex items-center justify-center shrink-0">
-                <Crown className="h-6 w-6 text-primary drop-shadow-lg" />
+        <div className={`fixed inset-y-0 left-0 w-64 backdrop-blur-sm transition-transform duration-300 ease-in-out lg:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="flex items-center justify-between p-4 h-[57px]">
+            <div className="flex items-center space-x-3 min-w-0 flex-1">
+              <AnimatedLogo />
+              <div className="min-w-0 flex-1">
+                <AnimatedLogoText text="Fantasy Footballin" className="truncate" />
               </div>
-              <span className="text-base sm:text-lg font-semibold text-foreground tracking-tight truncate">Fantasy Footballin</span>
             </div>
             <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} className="shrink-0 text-foreground hover:text-foreground">
               <X className="h-5 w-5" />
@@ -78,7 +79,7 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
                 to={item.href}
                 className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   item.current
-                    ? 'bg-primary/20 text-primary border border-primary/30'
+                    ? 'bg-primary/20 text-foreground border border-primary/30'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 }`}
                 onClick={() => setSidebarOpen(false)}
@@ -93,12 +94,10 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-grow border-r border-border/30">
-          <div className="flex items-center space-x-3 p-4 border-b border-border">
-            <div className="w-8 h-8 flex items-center justify-center">
-              <Crown className="h-6 w-6 text-primary drop-shadow-lg" />
-            </div>
-            <span className="text-lg font-semibold text-foreground tracking-tight">Fantasy Footballin</span>
+        <div className="flex flex-col flex-grow backdrop-blur-sm">
+          <div className="flex items-center space-x-3 p-4 h-[57px]">
+            <AnimatedLogo />
+            <AnimatedLogoText text="Fantasy Footballin" />
           </div>
           
           <nav className="flex-1 p-4 space-y-2">
@@ -108,7 +107,7 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
                 to={item.href}
                 className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   item.current
-                    ? 'bg-primary/20 text-primary border border-primary/30'
+                    ? 'bg-primary/20 text-foreground border border-primary/30'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 }`}
               >
@@ -122,8 +121,8 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
       </div>
 
       {/* Top bar - Fixed outside of scrollable content */}
-      <div className="fixed top-0 left-0 right-0 z-40 border-b border-border/30 lg:left-64 backdrop-blur-md glass lg:backdrop-blur-sm lg:bg-background/10">
-        <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3">
+      <div className="fixed top-0 left-0 right-0 z-40 lg:left-64 backdrop-blur-sm h-[57px]">
+        <div className="flex items-center justify-between px-2 sm:px-4 lg:px-4 py-2 sm:py-3 lg:py-4 h-full">
           <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
             <Button
               variant="ghost"
@@ -144,7 +143,7 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
             <ColorSchemeToggler />
             {onConfigClick && (
               <>
-                <div className="h-6 w-px bg-border hidden sm:block" />
+                <div className="h-6 w-px bg-border/30 hidden sm:block" />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -155,7 +154,7 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
                 </Button>
               </>
             )}
-            <div className="h-6 w-px bg-border hidden sm:block" />
+            <div className="h-6 w-px bg-border/30 hidden sm:block" />
             <div className="hidden md:flex items-center space-x-2 text-sm text-muted-foreground">
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
               <span>Live Data</span>
@@ -168,7 +167,7 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Page content */}
-        <main className="flex-1 pt-14 sm:pt-16">
+        <main className="flex-1 pt-[57px]">
           {children}
         </main>
       </div>

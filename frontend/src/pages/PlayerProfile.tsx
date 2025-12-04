@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { cn } from '../lib/utils'
+import { getTeamLogoWithFallback } from '../lib/teamLogos'
 import { 
   ArrowLeft,
   TrendingUp,
@@ -587,7 +588,16 @@ const PlayerProfile = () => {
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col items-center space-y-4">
-                {player.image_url ? (
+                {(player.position === 'DST' || player.position === 'D/ST') && player.team ? (
+                  <img 
+                    src={getTeamLogoWithFallback(player.team)} 
+                    alt={player.name}
+                    className="w-24 h-24 rounded-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=random&color=fff&size=96`
+                    }}
+                  />
+                ) : player.image_url ? (
                   <img 
                     src={player.image_url} 
                     alt={player.name}

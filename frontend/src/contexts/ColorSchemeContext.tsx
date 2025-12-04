@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
-export type ColorScheme = 'purple' | 'blackscale' | 'eagles' | 'cowboys' | 'niners' | 'rams'
+export type ColorScheme = 'purple' | 'blackscale' | 'eagles' | 'cowboys' | 'niners' | 'rams' | 'christmas' | 'chiefs' | 'packers' | 'steelers' | 'raiders' | 'dolphins' | 'bills' | 'ravens' | 'seahawks' | 'broncos' | 'saints' | 'bucs' | 'titans' | 'chargers' | 'patriots' | 'syracuse'
 
 interface ColorSchemeContextType {
   colorScheme: ColorScheme
@@ -28,7 +28,11 @@ export const ColorSchemeProvider: React.FC<ColorSchemeProviderProps> = ({ childr
     document.documentElement.setAttribute('data-color-scheme', colorScheme)
     
     // Remove old scheme classes and add new one
-    document.documentElement.classList.remove('purple-scheme', 'blackscale-scheme', 'eagles-scheme', 'cowboys-scheme', 'niners-scheme', 'rams-scheme')
+    document.documentElement.classList.remove(
+      'purple-scheme', 'blackscale-scheme', 'eagles-scheme', 'cowboys-scheme', 'niners-scheme', 'rams-scheme', 'christmas-scheme',
+      'chiefs-scheme', 'packers-scheme', 'steelers-scheme', 'raiders-scheme', 'dolphins-scheme', 'bills-scheme', 'ravens-scheme',
+      'seahawks-scheme', 'broncos-scheme', 'saints-scheme', 'bucs-scheme', 'titans-scheme', 'chargers-scheme', 'patriots-scheme', 'syracuse-scheme'
+    )
     document.documentElement.classList.add(`${colorScheme}-scheme`)
   }, [colorScheme])
 

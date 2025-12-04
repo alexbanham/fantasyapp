@@ -30,7 +30,7 @@ const NFLWeekDisplay: React.FC<NFLWeekDisplayProps> = ({ config }) => {
         <div className="flex items-center gap-2 sm:gap-3">
           <Calendar className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-primary shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary truncate">
+            <div className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground truncate">
               NFL Week {config.currentWeek} - {config.currentSeason}
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground">

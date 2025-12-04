@@ -1,5 +1,6 @@
 import React from 'react'
-import { Clock, RefreshCw, Activity, CheckCircle, AlertCircle, X, Power, PowerOff, Newspaper, Users, Calendar, DollarSign, User } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Clock, RefreshCw, Activity, CheckCircle, AlertCircle, X, Power, PowerOff, Newspaper, Users, Calendar, DollarSign, User, Trophy } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
@@ -50,6 +51,8 @@ const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
   currentWeek,
   currentSeason
 }) => {
+  const navigate = useNavigate()
+  
   if (!isOpen) return null
 
   return (
@@ -291,6 +294,25 @@ const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
                     <span className="text-muted-foreground text-xs">{syncState.playerPropsSyncMessage}</span>
                   </div>
                 )}
+              </div>
+
+              {/* Another Divider */}
+              <div className="border-t border-border/30 my-4" />
+
+              {/* Syracuse Orange Section */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-foreground">Syracuse Orange</h4>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    navigate('/orangemen')
+                    onClose()
+                  }}
+                  className="w-full bg-orange-50 dark:bg-orange-950 border-orange-300 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900"
+                >
+                  <Trophy className="h-4 w-4 mr-2" />
+                  View Orangemen
+                </Button>
               </div>
 
               {/* Another Divider */}

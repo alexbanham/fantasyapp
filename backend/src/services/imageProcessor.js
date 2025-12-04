@@ -45,11 +45,18 @@ class ImageProcessor {
         return null
       }
       // Try multiple attributes for image URL
-      const urlAttributes = ['src', 'data-src', 'data-lazy-src', 'data-original', 'data-srcset']
+      const urlAttributes = ['data-src', 'data-lazy-src', 'data-original', 'src', 'data-srcset']
       let imageUrl = null
       for (const attr of urlAttributes) {
         imageUrl = imgElement.attr(attr)
-        if (imageUrl) break
+        // Skip placeholder images
+        if (imageUrl && !imageUrl.includes('base64') && !imageUrl.includes('data:image') && 
+            !imageUrl.includes('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')) {
+          break
+        } else if (imageUrl) {
+          // Reset if placeholder found
+          imageUrl = null
+        }
       }
       if (!imageUrl) {
         return null
@@ -75,6 +82,14 @@ class ImageProcessor {
       } else if (imageUrl.startsWith('//')) {
         imageUrl = `https:${imageUrl}`
       }
+      
+      // Final check: reject placeholder images
+      if (imageUrl.includes('base64') || 
+          imageUrl.includes('data:image') ||
+          imageUrl.includes('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')) {
+        return null
+      }
+      
       // Optimize image URL for better quality
       imageUrl = this.optimizeImageUrl(imageUrl, source)
       return imageUrl

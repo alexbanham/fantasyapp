@@ -103,9 +103,10 @@ interface GameHighlightsProps {
   className?: string
   week?: number
   season?: number
+  isPollingActive?: boolean // Whether live games polling is active
 }
 
-const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, season }) => {
+const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, season, isPollingActive = false }) => {
   const [highlights, setHighlights] = useState<Highlight | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
@@ -114,6 +115,7 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, s
   const hasLoadedOnceRef = React.useRef(false)
   const previousWeekRef = React.useRef<number | undefined>(undefined)
   const previousSeasonRef = React.useRef<number | undefined>(undefined)
+  const previousPollingStatusRef = React.useRef<boolean | undefined>(undefined)
   
   // Cache key includes week and season for proper cache invalidation
   const getCacheKey = () => `game_highlights_${week ?? 'current'}_${season ?? 'current'}`
@@ -135,9 +137,36 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, s
   }, [week, season])
 
   useEffect(() => {
+    // Only fetch highlights when polling is NOT active
+    // Highlights are shown when there are no live games, so we don't need to fetch
+    // when polling is active (live games are being tracked)
+    if (isPollingActive) {
+      // If polling becomes active, we don't need highlights (live games are shown instead)
+      // Reset loading state if we were loading
+      if (isLoading && !highlights) {
+        setIsLoading(false)
+      }
+      previousPollingStatusRef.current = isPollingActive
+      return
+    }
+
+    // Polling is stopped - fetch highlights if needed
     const fetchHighlights = async () => {
-      // Only show loading spinner on initial load or when week/season changes
+      // Check if we need to fetch:
+      // 1. Initial load (never loaded before)
+      // 2. Week/season changed
+      // 3. Polling just stopped (transitioned from active to inactive)
       const isWeekSeasonChange = week !== previousWeekRef.current || season !== previousSeasonRef.current
+      const pollingJustStopped = previousPollingStatusRef.current === true && isPollingActive === false
+      const shouldFetch = !hasLoadedOnceRef.current || isWeekSeasonChange || pollingJustStopped
+      
+      // If we already have highlights and nothing changed, don't fetch again
+      if (!shouldFetch && hasLoadedOnceRef.current) {
+        previousPollingStatusRef.current = isPollingActive
+        return
+      }
+      
+      // Only show loading spinner on initial load or when week/season changes
       const isInitialLoad = !hasLoadedOnceRef.current || isWeekSeasonChange
       
       if (isInitialLoad) {
@@ -145,7 +174,7 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, s
         previousWeekRef.current = week
         previousSeasonRef.current = season
       } else if (hasLoadedOnceRef.current) {
-        // For subsequent updates (polling), use a subtle refreshing indicator
+        // For subsequent updates, use a subtle refreshing indicator
         setIsRefreshing(true)
       }
       
@@ -168,11 +197,12 @@ const GameHighlights: React.FC<GameHighlightsProps> = ({ className = '', week, s
       } finally {
         setIsLoading(false)
         setIsRefreshing(false)
+        previousPollingStatusRef.current = isPollingActive
       }
     }
 
     fetchHighlights()
-  }, [week, season])
+  }, [week, season, isPollingActive])
 
   // Only show loading spinner if we don't have data yet (initial load)
   if (isLoading && !highlights) {

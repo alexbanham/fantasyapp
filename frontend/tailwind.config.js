@@ -110,11 +110,21 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
+        inter: ["'Inter'", 'system-ui', '-apple-system', 'sans-serif'],
+        montserrat: ["'Montserrat'", 'system-ui', 'sans-serif'],
+        roboto: ["'Roboto'", 'system-ui', 'sans-serif'],
+        poppins: ["'Poppins'", 'system-ui', 'sans-serif'],
+        overpass: ["'Overpass'", 'system-ui', 'sans-serif'],
+        'open-sans': ["'Open Sans'", 'system-ui', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'spin-slow': 'spin 8s linear infinite',
+        'orbit': 'orbit 6s linear infinite',
+        'orbit-reverse': 'orbitReverse 8s linear infinite',
+        'orbit-slow': 'orbitSlow 10s linear infinite',
       },
       keyframes: {
         fadeIn: {

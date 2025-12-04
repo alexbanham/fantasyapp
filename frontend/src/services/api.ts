@@ -991,6 +991,46 @@ export const getTeamWeeklyBreakdown = async (teamId: number, seasonId?: number) 
   return response.data as WeeklyBreakdownResponse
 }
 
+export interface WaiverWirePlayer {
+  playerId: number
+  name: string
+  position: string
+  points: number
+  proTeamId?: string | null
+}
+
+export interface WaiverWireWeek {
+  week: number
+  totalPoints: number
+  playerCount: number
+  topPlayers: WaiverWirePlayer[]
+  significantScores: WaiverWirePlayer[]
+}
+
+export interface WaiverWireAnalysis {
+  success: boolean
+  season: number
+  week: number | 'all'
+  seasonTotals: {
+    totalPoints: number
+    totalPlayers: number
+    avgPointsPerWeek: number
+    significantScoresCount: number
+  }
+  weeklyBreakdown: WaiverWireWeek[]
+  topSignificantScores: Array<WaiverWirePlayer & { week: number }>
+}
+
+export const getWaiverWireAnalysis = async (seasonId?: number, week?: number | null) => {
+  const params = new URLSearchParams()
+  if (seasonId) params.append('seasonId', seasonId.toString())
+  if (week) params.append('week', week.toString())
+  const queryString = params.toString()
+  const url = queryString ? `/league/analytics/waiver-wire?${queryString}` : '/league/analytics/waiver-wire'
+  const response = await api.get(url)
+  return response.data as WaiverWireAnalysis
+}
+
 // Data Export API
 export const dataExportApi = {
   // Get available data exports
@@ -1210,6 +1250,120 @@ export const syncPlayerPropsForWeek = async (week: number, season?: number, mark
   if (season) params.append('season', season.toString())
   if (markets) params.append('markets', markets)
   const response = await api.post(`/betting-odds/sync/player-props/week/${week}?${params.toString()}`)
+  return response.data
+}
+
+// Syracuse Orange Basketball API calls
+export const getSyracuseSchedule = async (season?: number) => {
+  const params = season ? `?season=${season}` : ''
+  const response = await api.get(`/syracuse/schedule${params}`)
+  return response.data
+}
+
+export const getSyracuseRoster = async (season?: number) => {
+  const params = season ? `?season=${season}` : ''
+  const response = await api.get(`/syracuse/roster${params}`)
+  return response.data
+}
+
+export const getSyracuseNews = async (limit?: number) => {
+  const params = limit ? `?limit=${limit}` : ''
+  const response = await api.get(`/syracuse/news${params}`)
+  return response.data
+}
+
+export const getSyracuseStats = async (season?: number) => {
+  const params = season ? `?season=${season}` : ''
+  const response = await api.get(`/syracuse/stats${params}`)
+  return response.data
+}
+
+export const getSyracusePlayerStats = async (season?: number) => {
+  const params = season ? `?season=${season}` : ''
+  const response = await api.get(`/syracuse/player-stats${params}`)
+  return response.data
+}
+
+export const getSyracuseGame = async (gameId: string) => {
+  const response = await api.get(`/syracuse/game/${gameId}`)
+  return response.data
+}
+
+export const syncSyracuseData = async (season?: number) => {
+  const response = await api.post('/syracuse/sync', { season })
+  return response.data
+}
+
+// NFL Standings API calls
+export interface NFLTeam {
+  id: string
+  name: string
+  abbreviation: string
+  logo?: string
+  wins: number
+  losses: number
+  ties: number
+  winPercentage: number
+  pointsFor: number
+  pointsAgainst: number
+  divisionRank: number
+  conferenceRank: number
+  playoffSeed: number | null
+  inPlayoffs: boolean
+}
+
+export interface NFLDivision {
+  name: string
+  teams: NFLTeam[]
+}
+
+export interface NFLConference {
+  name: string
+  divisions: Record<string, NFLDivision>
+}
+
+export interface NFLStandingsResponse {
+  success: boolean
+  season: number
+  week: number
+  conferences: Record<string, NFLConference>
+  lastUpdated: string
+}
+
+export interface PlayoffScenario {
+  type: string
+  description: string
+  winsNeeded: number
+  canMakePlayoffs: boolean
+  bestCaseRecord: string
+  worstCaseRecord: string
+}
+
+export interface PlayoffScenariosResponse {
+  success: boolean
+  season: number
+  team: NFLTeam
+  conference: string
+  division: string
+  currentWeek: number
+  gamesRemaining: number
+  currentRecord: string
+  scenarios: PlayoffScenario[]
+}
+
+export const getNFLStandings = async (season?: number): Promise<NFLStandingsResponse> => {
+  const params = season ? `?season=${season}` : ''
+  const response = await api.get(`/nfl-standings${params}`)
+  return response.data
+}
+
+export const getPlayoffScenarios = async (teamAbbr: string, season?: number, week?: number): Promise<PlayoffScenariosResponse> => {
+  const params = new URLSearchParams()
+  if (season) params.append('season', season.toString())
+  if (week) params.append('week', week.toString())
+  const paramsString = params.toString()
+  const url = `/nfl-standings/playoff-scenarios/${teamAbbr}${paramsString ? `?${paramsString}` : ''}`
+  const response = await api.get(url)
   return response.data
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { ColorSchemeProvider, useColorScheme } from './contexts/ColorSchemeContext'
+import { FontProvider } from './contexts/FontContext'
 import { getBackgroundClass } from './lib/colorSchemes'
 import Layout from './components/Layout'
 import PasswordPrompt from './components/dashboard/PasswordPrompt'
@@ -20,6 +21,8 @@ import Games from './pages/Games'
 import Data from './pages/Data'
 import News from './pages/News'
 import Money from './pages/Money'
+import Orangemen from './pages/Orangemen'
+import Snowflakes from './components/Snowflakes'
 
 function AppContent() {
   const { colorScheme } = useColorScheme()
@@ -74,19 +77,19 @@ function AppContent() {
   return (
     <Router>
       <div className={`min-h-screen text-foreground ${getBackgroundClass(colorScheme)}`}>
-        <Layout onConfigClick={handleConfigClick}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/league" element={<League />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/games" element={<Games />} />
-            <Route path="/players" element={<PlayerBrowser />} />
-            <Route path="/players/:playerId" element={<PlayerProfile />} />
-            <Route path="/news" element={<News />} />
-            <Route path="/money" element={<Money />} />
-            <Route path="/data" element={<Data />} />
-          </Routes>
-        </Layout>
+        <Snowflakes />
+        <Routes>
+          <Route path="/orangemen" element={<Orangemen />} />
+          <Route path="/" element={<Layout onConfigClick={handleConfigClick}><Dashboard /></Layout>} />
+          <Route path="/league" element={<Layout onConfigClick={handleConfigClick}><League /></Layout>} />
+          <Route path="/analytics" element={<Layout onConfigClick={handleConfigClick}><Analytics /></Layout>} />
+          <Route path="/games" element={<Layout onConfigClick={handleConfigClick}><Games /></Layout>} />
+          <Route path="/players" element={<Layout onConfigClick={handleConfigClick}><PlayerBrowser /></Layout>} />
+          <Route path="/players/:playerId" element={<Layout onConfigClick={handleConfigClick}><PlayerProfile /></Layout>} />
+          <Route path="/news" element={<Layout onConfigClick={handleConfigClick}><News /></Layout>} />
+          <Route path="/money" element={<Layout onConfigClick={handleConfigClick}><Money /></Layout>} />
+          <Route path="/data" element={<Layout onConfigClick={handleConfigClick}><Data /></Layout>} />
+        </Routes>
         
         {/* Password Prompt Modal */}
         <PasswordPrompt
@@ -131,7 +134,9 @@ function App() {
 
   return (
     <ColorSchemeProvider>
-      <AppContent />
+      <FontProvider>
+        <AppContent />
+      </FontProvider>
     </ColorSchemeProvider>
   )
 }
