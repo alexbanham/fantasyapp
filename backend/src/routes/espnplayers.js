@@ -142,8 +142,8 @@ router.get('/top-performers', async (req, res) => {
     } = req.query;
     const currentWeek = parseInt(week) || 1;
     const limitNum = parseInt(limit);
-    // Get rostered players only for top performers (fantasy league context)
-    const allPlayers = await ESPNPlayer.find({ roster_status: 'rostered' }).lean();
+    // Get all players (rostered and unrostered) for top performers
+    const allPlayers = await ESPNPlayer.find({}).lean();
     // Filter players with actual points for the specified week
     const playersWithPoints = allPlayers.filter(player => {
       const weeklyActuals = player.weekly_actuals || {};

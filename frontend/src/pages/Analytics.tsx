@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
-import { TrendingUp, Trophy, AlertCircle, RefreshCw, X, ChevronRight, ChevronDown, Users, TrendingDown, Zap, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { TrendingUp, Trophy, AlertCircle, RefreshCw, X, ChevronRight, ChevronDown, Users, TrendingDown, Zap, AlertTriangle, BarChart3 } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
-import { getManagerScores, ManagerScore, getTeamWeeklyBreakdown, WeeklyBreakdownResponse, getWaiverWireAnalysis, WaiverWireAnalysis, getBoomBustStats, BoomBustStats } from '../services/api'
+import { getManagerScores, ManagerScore, getTeamWeeklyBreakdown, WeeklyBreakdownResponse, getWaiverWireAnalysis, WaiverWireAnalysis, getBoomBustStats, BoomBustStats, BoomWeekDetail, BustWeekDetail, PlayerBoomDetail, PlayerBustDetail } from '../services/api'
 
 const Analytics = () => {
   const [managerScores, setManagerScores] = useState<ManagerScore[]>([])
@@ -20,6 +20,7 @@ const Analytics = () => {
   const [boomBustStats, setBoomBustStats] = useState<BoomBustStats[]>([])
   const [loadingBoomBust, setLoadingBoomBust] = useState(false)
   const [expandedBoomBustTeams, setExpandedBoomBustTeams] = useState<Set<number>>(new Set())
+  const [topPerformersModalOpen, setTopPerformersModalOpen] = useState(false)
 
   useEffect(() => {
     fetchAnalytics()
@@ -265,6 +266,10 @@ const Analytics = () => {
             </div>
             <div className="flex items-center space-x-2">
               <Badge variant="outline">{season} Season Totals</Badge>
+              <Button variant="ghost" size="sm" onClick={() => setTopPerformersModalOpen(true)}>
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Top Performers
+              </Button>
               <Button variant="ghost" size="sm" onClick={() => {
                 fetchAnalytics()
                 fetchWaiverWireAnalysis()
@@ -287,7 +292,7 @@ const Analytics = () => {
             {managerScores.map((team, idx) => (
               <Card 
                 key={team.teamId} 
-                className="p-4 hover:bg-accent/50 transition-colors"
+                className="p-4 hover:border-primary/50 transition-colors"
               >
                 <div 
                   className="flex items-center justify-between cursor-pointer"
@@ -442,7 +447,7 @@ const Analytics = () => {
                                           <div className="text-sm">
                                             <span className="font-semibold text-green-700">{formatScore(week.points)} pts</span>
                                             <span className="text-xs text-muted-foreground ml-2">
-                                              (avg: {formatScore(week.average)})
+                                              (proj: {formatScore(week.projected)})
                                             </span>
                                           </div>
                                         </div>
@@ -472,7 +477,7 @@ const Analytics = () => {
                                           <div className="text-sm">
                                             <span className="font-semibold text-red-700">{formatScore(week.points)} pts</span>
                                             <span className="text-xs text-muted-foreground ml-2">
-                                              (avg: {formatScore(week.average)})
+                                              (proj: {formatScore(week.projected)})
                                             </span>
                                           </div>
                                         </div>
@@ -1127,7 +1132,473 @@ const Analytics = () => {
           </div>
         )}
       </div>
+
+      {/* Top Performers Side Modal */}
+      {topPerformersModalOpen && (
+        <TopPerformersModal
+          isOpen={topPerformersModalOpen}
+          onClose={() => setTopPerformersModalOpen(false)}
+          boomBustStats={boomBustStats}
+          loading={loadingBoomBust}
+        />
+      )}
     </div>
+  )
+}
+
+// Top Performers Side Modal Component
+interface TopPerformersModalProps {
+  isOpen: boolean
+  onClose: () => void
+  boomBustStats: BoomBustStats[]
+  loading: boolean
+}
+
+const TopPerformersModal: React.FC<TopPerformersModalProps> = ({ isOpen, onClose, boomBustStats, loading }) => {
+  const topPerformers = useMemo(() => {
+    if (loading || boomBustStats.length === 0) {
+      return {
+        topBoomWeeks: [],
+        topBustWeeks: [],
+        topPlayerBooms: [],
+        topPlayerBusts: [],
+        teamBoomLeaders: [],
+        teamBustLeaders: [],
+        teamPlayerBoomLeaders: [],
+        teamPlayerBustLeaders: []
+      }
+    }
+
+    // Collect all boom weeks with team info
+    const allBoomWeeks: Array<BoomWeekDetail & { teamName: string; teamId: number }> = []
+    boomBustStats.forEach(team => {
+      team.boomWeekDetails.forEach(week => {
+        allBoomWeeks.push({ ...week, teamName: team.teamName, teamId: team.teamId })
+      })
+    })
+
+    // Collect all bust weeks with team info
+    const allBustWeeks: Array<BustWeekDetail & { teamName: string; teamId: number }> = []
+    boomBustStats.forEach(team => {
+      team.bustWeekDetails.forEach(week => {
+        allBustWeeks.push({ ...week, teamName: team.teamName, teamId: team.teamId })
+      })
+    })
+
+    // Collect all player booms with team info
+    const allPlayerBooms: Array<PlayerBoomDetail & { teamName: string; teamId: number }> = []
+    boomBustStats.forEach(team => {
+      team.playerBoomDetails.forEach(player => {
+        allPlayerBooms.push({ ...player, teamName: team.teamName, teamId: team.teamId })
+      })
+    })
+
+    // Collect all player busts with team info
+    const allPlayerBusts: Array<PlayerBustDetail & { teamName: string; teamId: number }> = []
+    boomBustStats.forEach(team => {
+      team.playerBustDetails.forEach(player => {
+        allPlayerBusts.push({ ...player, teamName: team.teamName, teamId: team.teamId })
+      })
+    })
+
+    // Team leaderboards - teams with most boom/bust weeks and player booms/busts
+    const teamBoomLeaders = boomBustStats
+      .map(team => ({
+        teamId: team.teamId,
+        teamName: team.teamName,
+        logo: team.logo,
+        count: team.boomWeeks
+      }))
+      .sort((a, b) => b.count - a.count)
+
+    const teamBustLeaders = boomBustStats
+      .map(team => ({
+        teamId: team.teamId,
+        teamName: team.teamName,
+        logo: team.logo,
+        count: team.bustWeeks
+      }))
+      .sort((a, b) => b.count - a.count)
+
+    const teamPlayerBoomLeaders = boomBustStats
+      .map(team => ({
+        teamId: team.teamId,
+        teamName: team.teamName,
+        logo: team.logo,
+        count: team.playerBooms
+      }))
+      .sort((a, b) => b.count - a.count)
+
+    const teamPlayerBustLeaders = boomBustStats
+      .map(team => ({
+        teamId: team.teamId,
+        teamName: team.teamName,
+        logo: team.logo,
+        count: team.playerBusts
+      }))
+      .sort((a, b) => b.count - a.count)
+
+    // Sort and get top results
+    return {
+      topBoomWeeks: allBoomWeeks.sort((a, b) => b.percentageDiff - a.percentageDiff).slice(0, 20), // Top 20 boom weeks
+      topBustWeeks: allBustWeeks.sort((a, b) => a.percentageDiff - b.percentageDiff).slice(0, 20), // Top 20 bust weeks
+      topPlayerBooms: allPlayerBooms.sort((a, b) => b.diff - a.diff).slice(0, 50), // Sort by points over, top 50
+      topPlayerBusts: allPlayerBusts.sort((a, b) => a.diff - b.diff).slice(0, 50), // Sort by points under, top 50
+      teamBoomLeaders,
+      teamBustLeaders,
+      teamPlayerBoomLeaders,
+      teamPlayerBustLeaders
+    }
+  }, [boomBustStats, loading])
+
+  if (!isOpen) return null
+
+  const formatScore = (score: number) => {
+    return Math.round(score * 10) / 10
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={(e) => e.stopPropagation()}
+      />
+      
+      {/* Modal */}
+      <div 
+        className="relative bg-background border border-border rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
+          <div className="flex items-center space-x-3">
+            <BarChart3 className="h-6 w-6 text-primary" />
+            <div>
+              <h2 className="text-2xl font-semibold text-foreground">Top Performers</h2>
+              <p className="text-sm text-muted-foreground">Top booms, busts, and team leaders</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {loading ? (
+              <div className="col-span-2 flex items-center justify-center py-12">
+                <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Loading...</span>
+              </div>
+            ) : (
+              <>
+                {/* Left Column */}
+                <div className="space-y-8">
+                  {/* Team Leaders - Boom Weeks */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-green-600 mb-4 flex items-center space-x-2">
+                      <Trophy className="h-5 w-5" />
+                      <span>Most Boom Weeks</span>
+                    </h3>
+                    {topPerformers.teamBoomLeaders.length > 0 ? (
+                      <div className="space-y-2">
+                        {topPerformers.teamBoomLeaders.map((team, idx) => (
+                          <div key={team.teamId} className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                            <div className="flex items-center space-x-3">
+                              <Badge variant="outline" className="bg-green-500/20 w-8 text-center">
+                                {idx + 1}
+                              </Badge>
+                              {team.logo && (
+                                <img src={team.logo} alt={team.teamName} className="w-8 h-8 rounded-full object-cover" />
+                              )}
+                              <span className="font-semibold text-foreground">{team.teamName}</span>
+                            </div>
+                            <span className="font-bold text-green-600">{team.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No data available</p>
+                    )}
+                  </div>
+
+                  {/* Team Leaders - Bust Weeks */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-red-600 mb-4 flex items-center space-x-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      <span>Most Bust Weeks</span>
+                    </h3>
+                    {topPerformers.teamBustLeaders.length > 0 ? (
+                      <div className="space-y-2">
+                        {topPerformers.teamBustLeaders.map((team, idx) => (
+                          <div key={team.teamId} className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+                            <div className="flex items-center space-x-3">
+                              <Badge variant="outline" className="bg-red-500/20 w-8 text-center">
+                                {idx + 1}
+                              </Badge>
+                              {team.logo && (
+                                <img src={team.logo} alt={team.teamName} className="w-8 h-8 rounded-full object-cover" />
+                              )}
+                              <span className="font-semibold text-foreground">{team.teamName}</span>
+                            </div>
+                            <span className="font-bold text-red-600">{team.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No data available</p>
+                    )}
+                  </div>
+
+                  {/* Team Leaders - Player Booms */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-green-600 mb-4 flex items-center space-x-2">
+                      <Zap className="h-5 w-5" />
+                      <span>Most Player Booms</span>
+                    </h3>
+                    {topPerformers.teamPlayerBoomLeaders.length > 0 ? (
+                      <div className="space-y-2">
+                        {topPerformers.teamPlayerBoomLeaders.map((team, idx) => (
+                          <div key={team.teamId} className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                            <div className="flex items-center space-x-3">
+                              <Badge variant="outline" className="bg-green-500/20 w-8 text-center">
+                                {idx + 1}
+                              </Badge>
+                              {team.logo && (
+                                <img src={team.logo} alt={team.teamName} className="w-8 h-8 rounded-full object-cover" />
+                              )}
+                              <span className="font-semibold text-foreground">{team.teamName}</span>
+                            </div>
+                            <span className="font-bold text-green-600">{team.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No data available</p>
+                    )}
+                  </div>
+
+                  {/* Team Leaders - Player Busts */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-red-600 mb-4 flex items-center space-x-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      <span>Most Player Busts</span>
+                    </h3>
+                    {topPerformers.teamPlayerBustLeaders.length > 0 ? (
+                      <div className="space-y-2">
+                        {topPerformers.teamPlayerBustLeaders.map((team, idx) => (
+                          <div key={team.teamId} className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+                            <div className="flex items-center space-x-3">
+                              <Badge variant="outline" className="bg-red-500/20 w-8 text-center">
+                                {idx + 1}
+                              </Badge>
+                              {team.logo && (
+                                <img src={team.logo} alt={team.teamName} className="w-8 h-8 rounded-full object-cover" />
+                              )}
+                              <span className="font-semibold text-foreground">{team.teamName}</span>
+                            </div>
+                            <span className="font-bold text-red-600">{team.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No data available</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-8">
+                  {/* Top Boom Weeks */}
+                  <div>
+                  <h3 className="text-lg font-semibold text-green-600 mb-4 flex items-center space-x-2">
+                    <Zap className="h-5 w-5" />
+                    <span>Top 20 Boom Weeks</span>
+                  </h3>
+                  {topPerformers.topBoomWeeks.length > 0 ? (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                      {topPerformers.topBoomWeeks.map((week, idx) => (
+                        <div key={`${week.teamId}-${week.week}`} className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="outline" className="bg-green-500/20">
+                                #{idx + 1}
+                              </Badge>
+                              <span className="font-semibold text-foreground">{week.teamName}</span>
+                            </div>
+                            <Badge variant="outline">Week {week.week}</Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Points: </span>
+                              <span className="font-semibold text-green-700">{formatScore(week.points)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Projected: </span>
+                              <span className="font-semibold">{formatScore(week.projected)}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Over: </span>
+                              <span className="font-bold text-green-600">
+                                +{formatScore(week.diff)} ({formatScore(week.percentageDiff)}%)
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No boom weeks recorded</p>
+                  )}
+                </div>
+
+                {/* Top Bust Weeks */}
+                <div>
+                  <h3 className="text-lg font-semibold text-red-600 mb-4 flex items-center space-x-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    <span>Top 20 Bust Weeks</span>
+                  </h3>
+                  {topPerformers.topBustWeeks.length > 0 ? (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                      {topPerformers.topBustWeeks.map((week, idx) => (
+                        <div key={`${week.teamId}-${week.week}`} className="p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="outline" className="bg-red-500/20">
+                                #{idx + 1}
+                              </Badge>
+                              <span className="font-semibold text-foreground">{week.teamName}</span>
+                            </div>
+                            <Badge variant="outline">Week {week.week}</Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Points: </span>
+                              <span className="font-semibold text-red-700">{formatScore(week.points)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Projected: </span>
+                              <span className="font-semibold">{formatScore(week.projected)}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Under: </span>
+                              <span className="font-bold text-red-600">
+                                {formatScore(week.diff)} ({formatScore(week.percentageDiff)}%)
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No bust weeks recorded</p>
+                  )}
+                </div>
+
+                {/* Top Player Booms */}
+                <div>
+                  <h3 className="text-lg font-semibold text-green-600 mb-4 flex items-center space-x-2">
+                    <Zap className="h-5 w-5" />
+                    <span>Top 50 Player Booms</span>
+                  </h3>
+                  {topPerformers.topPlayerBooms.length > 0 ? (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                      {topPerformers.topPlayerBooms.map((player, idx) => (
+                        <div key={`${player.teamId}-${player.playerId}-${player.week}`} className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="outline" className="bg-green-500/20">
+                                #{idx + 1}
+                              </Badge>
+                              <span className="font-semibold text-foreground">{player.name}</span>
+                              {player.wasStarter && (
+                                <Badge variant="secondary" className="text-xs">Started</Badge>
+                              )}
+                            </div>
+                            <Badge variant="outline">W{player.week}</Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground mb-2">
+                            {player.position} • {player.teamName}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Actual: </span>
+                              <span className="font-semibold text-green-700">{formatScore(player.actual)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Projected: </span>
+                              <span className="font-semibold">{formatScore(player.projected)}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Over: </span>
+                              <span className="font-bold text-green-600">
+                                +{formatScore(player.diff)} pts
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No player booms recorded</p>
+                  )}
+                </div>
+
+                {/* Top Player Busts */}
+                <div>
+                  <h3 className="text-lg font-semibold text-red-600 mb-4 flex items-center space-x-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    <span>Top 50 Player Busts</span>
+                  </h3>
+                  {topPerformers.topPlayerBusts.length > 0 ? (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                      {topPerformers.topPlayerBusts.map((player, idx) => (
+                        <div key={`${player.teamId}-${player.playerId}-${player.week}`} className="p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="outline" className="bg-red-500/20">
+                                #{idx + 1}
+                              </Badge>
+                              <span className="font-semibold text-foreground">{player.name}</span>
+                              {player.wasStarter && (
+                                <Badge variant="secondary" className="text-xs">Started</Badge>
+                              )}
+                            </div>
+                            <Badge variant="outline">W{player.week}</Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground mb-2">
+                            {player.position} • {player.teamName}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Actual: </span>
+                              <span className="font-semibold text-red-700">{formatScore(player.actual)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Projected: </span>
+                              <span className="font-semibold">{formatScore(player.projected)}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Under: </span>
+                              <span className="font-bold text-red-600">
+                                {formatScore(player.diff)} pts
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No player busts recorded</p>
+                  )}
+                </div>
+                </div>
+              </>
+            )}
+            </div>
+          </div>
+        </div>
+      </div>
   )
 }
 

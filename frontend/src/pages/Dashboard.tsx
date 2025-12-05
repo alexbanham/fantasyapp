@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Calendar } from 'lucide-react'
 import LiveScoreStrip from '../components/LiveScoreStrip'
+import RecentGames from '../components/RecentGames'
 import NFLWeekDisplay from '../components/dashboard/NFLWeekDisplay'
 import GameHighlights from '../components/dashboard/GameHighlights'
 import MatchupModal from '../components/dashboard/MatchupModal'
@@ -96,6 +97,16 @@ const Dashboard: React.FC = () => {
               isPollingActive={pollingStatus.isPolling}
               onLiveGamesRefresh={syncCurrentWeekPlayers}
             />
+
+            {/* Recent Games - Show when no live games (and not actively checking) */}
+            {!checkingLiveGames && !hasLiveGames && (
+              <div className="mb-4 sm:mb-6">
+                <RecentGames 
+                  currentWeek={config?.currentWeek}
+                  currentSeason={config?.currentSeason}
+                />
+              </div>
+            )}
 
             {/* Highlights - Show when no live games (and not actively checking) */}
             {!checkingLiveGames && !hasLiveGames && (

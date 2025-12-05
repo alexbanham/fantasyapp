@@ -360,6 +360,68 @@ router.get('/:eventId/scorers', async (req, res) => {
       };
     });
     
+    // Also fetch unrostered players from ESPNPlayer database who are on the playing teams
+    // This ensures we show all players, not just those on fantasy rosters
+    const allPlayersFromDB = await ESPNPlayer.find({
+      pro_team_id: { $in: [homeTeamAbbr, awayTeamAbbr] }
+    }).select('espn_id headshot_url roster_status fantasy_team_id fantasy_team_name weekly_actuals weekly_projections pro_team_id position name').lean();
+    
+    // Create a set of already included player IDs
+    const includedPlayerIds = new Set([
+      ...homePlayersWithImages.map(p => p.espnId),
+      ...awayPlayersWithImages.map(p => p.espnId)
+    ]);
+    
+    // Add unrostered players who have points for this week
+    allPlayersFromDB.forEach(p => {
+      // Skip if already included
+      if (includedPlayerIds.has(p.espn_id)) {
+        return;
+      }
+      
+      // Get weekly actuals for the current week
+      let weekActuals = {};
+      if (p.weekly_actuals) {
+        if (typeof p.weekly_actuals.get === 'function') {
+          weekActuals = p.weekly_actuals.get(currentWeek.toString()) || {};
+        } else if (p.weekly_actuals[currentWeek.toString()]) {
+          weekActuals = p.weekly_actuals[currentWeek.toString()];
+        }
+      }
+      
+      // Get fantasy points for the specified scoring type
+      const fantasyPoints = weekActuals[scoringType] || weekActuals.ppr || weekActuals.half || weekActuals.std || 0;
+      
+      // Only include if player has points
+      if (fantasyPoints > 0) {
+        const isHomeTeam = p.pro_team_id === homeTeamAbbr;
+        const isAwayTeam = p.pro_team_id === awayTeamAbbr;
+        
+        if (isHomeTeam || isAwayTeam) {
+          const playerData = {
+            espnId: p.espn_id,
+            name: p.name,
+            position: p.position,
+            proTeamId: p.pro_team_id,
+            fantasyPoints: fantasyPoints,
+            projectedPoints: null, // Unrostered players may not have projections
+            headshot_url: p.headshot_url || null,
+            roster_status: p.roster_status || 'free_agent',
+            fantasy_team_id: p.fantasy_team_id || null,
+            fantasy_team_name: p.fantasy_team_name || null
+          };
+          
+          if (isHomeTeam) {
+            homePlayersWithImages.push(playerData);
+          } else {
+            awayPlayersWithImages.push(playerData);
+          }
+          
+          includedPlayerIds.add(p.espn_id);
+        }
+      }
+    });
+    
     // Sort each team by fantasy points descending
     homePlayersWithImages.sort((a, b) => (b.fantasyPoints || 0) - (a.fantasyPoints || 0));
     awayPlayersWithImages.sort((a, b) => (b.fantasyPoints || 0) - (a.fantasyPoints || 0));
@@ -441,6 +503,32 @@ router.get('/highlights', async (req, res) => {
       }
     }
     
+    // Also check for games that might be in progress or recently finished but not yet marked as final
+    // This helps catch games that just finished but haven't been updated in the database yet
+    if (recentGames.length === 0) {
+      const allWeekGames = await Game.find({
+        season: currentSeason,
+        week: currentWeek
+      })
+        .sort({ date: -1 })
+        .limit(20)
+        .lean();
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[HIGHLIGHTS] Found ${allWeekGames.length} total games for week ${currentWeek}, ${allWeekGames.filter(g => g.status === 'STATUS_FINAL').length} are final`);
+      }
+      
+      // If we have games but none are final, still try to process them (they might have player data)
+      // This allows highlights to show even if game status hasn't updated yet
+      if (allWeekGames.length > 0) {
+        recentGames = allWeekGames.filter(g => 
+          g.status === 'STATUS_FINAL' || 
+          g.status === 'STATUS_IN' || 
+          g.status === 'STATUS_HALFTIME'
+        );
+      }
+    }
+    
     // Get all games for this week to check player game status
     // This is needed to filter out players who haven't played yet
     const allGames = await Game.find({
@@ -465,11 +553,23 @@ router.get('/highlights', async (req, res) => {
       }
     });
     
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[HIGHLIGHTS] Built team game status map with ${teamGameStatusMap.size} teams`);
+    }
+    
     // Helper function to check if a player's game has been played
-    const hasPlayerPlayed = (proTeamId) => {
-      if (!proTeamId) return false;
+    // Made more lenient: if player has points data, assume they played (even if game status is missing)
+    const hasPlayerPlayed = (proTeamId, hasPointsData = false) => {
+      if (!proTeamId) {
+        // If no proTeamId but has points data, allow it (might be a data sync issue)
+        return hasPointsData;
+      }
       const gameStatus = teamGameStatusMap.get(proTeamId);
-      if (!gameStatus) return false;
+      if (!gameStatus) {
+        // If game status not found but player has points, assume they played
+        // This handles cases where game data hasn't synced yet but player data has
+        return hasPointsData;
+      }
       // Only include players whose games are final, in progress, or at halftime
       // Exclude scheduled/pre games
       return gameStatus.status === 'STATUS_FINAL' || 
@@ -512,7 +612,8 @@ router.get('/highlights', async (req, res) => {
         
         if (points && points > 0) {
           // Only include players whose games have been played (final, in progress, or halftime)
-          if (hasPlayerPlayed(player.pro_team_id)) {
+          // Pass hasPointsData=true to be more lenient if game status is missing
+          if (hasPlayerPlayed(player.pro_team_id, true)) {
             playersWithData++;
             topScorers.push({
               espn_id: player.espn_id,
@@ -583,11 +684,13 @@ router.get('/highlights', async (req, res) => {
           
           if (isAwayTeam || isHomeTeam) {
             // Only include players whose games have been played
-            if (!hasPlayerPlayed(player.pro_team_id)) {
+            // Check if player has points data to be more lenient
+            const weekData = weeklyActuals[game.week.toString()];
+            const hasPoints = weekData && typeof weekData === 'object' && (weekData.ppr || weekData.half || weekData.std);
+            if (!hasPlayerPlayed(player.pro_team_id, !!hasPoints)) {
               continue;
             }
             
-            const weekData = weeklyActuals[game.week.toString()];
             if (weekData && typeof weekData === 'object') {
               const points = weekData.ppr || weekData.half || weekData.std;
               if (points && points > 0) {
@@ -658,7 +761,8 @@ router.get('/highlights', async (req, res) => {
         
         if (actualPoints && projPoints) {
           // Only include players whose games have been played (final, in progress, or halftime)
-          if (!hasPlayerPlayed(player.pro_team_id)) {
+          // Pass hasPointsData=true to be more lenient if game status is missing
+          if (!hasPlayerPlayed(player.pro_team_id, true)) {
             continue;
           }
           
@@ -726,7 +830,8 @@ router.get('/highlights', async (req, res) => {
         
         if (actualPoints !== null && projPoints !== null && projPoints > 10) {
           // Only include players whose games have been played (final, in progress, or halftime)
-          if (!hasPlayerPlayed(player.pro_team_id)) {
+          // Pass hasPointsData=true to be more lenient if game status is missing
+          if (!hasPlayerPlayed(player.pro_team_id, true)) {
             continue;
           }
           

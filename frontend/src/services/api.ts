@@ -1034,7 +1034,7 @@ export const getWaiverWireAnalysis = async (seasonId?: number, week?: number | n
 export interface BoomWeekDetail {
   week: number
   points: number
-  average: number
+  projected: number
   diff: number
   percentageDiff: number
 }
@@ -1042,7 +1042,7 @@ export interface BoomWeekDetail {
 export interface BustWeekDetail {
   week: number
   points: number
-  average: number
+  projected: number
   diff: number
   percentageDiff: number
 }
