@@ -179,3 +179,4 @@ export const renderTeamBadge = (proTeamId: string, size: 'sm' | 'md' = 'md'): Re
   )
 }
 
+

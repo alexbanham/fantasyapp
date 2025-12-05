@@ -1031,6 +1031,66 @@ export const getWaiverWireAnalysis = async (seasonId?: number, week?: number | n
   return response.data as WaiverWireAnalysis
 }
 
+export interface BoomWeekDetail {
+  week: number
+  points: number
+  average: number
+  diff: number
+  percentageDiff: number
+}
+
+export interface BustWeekDetail {
+  week: number
+  points: number
+  average: number
+  diff: number
+  percentageDiff: number
+}
+
+export interface PlayerBoomDetail {
+  week: number
+  playerId: number
+  name: string
+  position: string
+  actual: number
+  projected: number
+  diff: number
+  percentage: number
+  wasStarter: boolean
+}
+
+export interface PlayerBustDetail {
+  week: number
+  playerId: number
+  name: string
+  position: string
+  actual: number
+  projected: number
+  diff: number
+  percentage: number
+  wasStarter: boolean
+}
+
+export interface BoomBustStats {
+  teamId: number
+  teamName: string
+  logo?: string
+  boomWeeks: number
+  bustWeeks: number
+  playerBooms: number
+  playerBusts: number
+  boomWeekDetails: BoomWeekDetail[]
+  bustWeekDetails: BustWeekDetail[]
+  playerBoomDetails: PlayerBoomDetail[]
+  playerBustDetails: PlayerBustDetail[]
+}
+
+export const getBoomBustStats = async (seasonId?: number) => {
+  const params = seasonId ? `?seasonId=${seasonId}` : ''
+  const response = await api.get(`/league/analytics/boom-bust${params}`)
+  return response.data as AnalyticsResponse<BoomBustStats>
+}
+
 // Data Export API
 export const dataExportApi = {
   // Get available data exports

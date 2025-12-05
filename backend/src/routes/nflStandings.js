@@ -380,7 +380,7 @@ router.get('/', async (req, res) => {
         allTeams.push(...division.teams);
       });
 
-      // Sort by win percentage, then points for
+      // Sort by win percentage, then points for (for conference ranking)
       allTeams.sort((a, b) => {
         if (b.winPercentage !== a.winPercentage) {
           return b.winPercentage - a.winPercentage;
@@ -388,12 +388,54 @@ router.get('/', async (req, res) => {
         return b.pointsFor - a.pointsFor;
       });
 
-      // Assign conference rank and playoff seed
+      // Assign conference rank to all teams
       allTeams.forEach((team, index) => {
         team.conferenceRank = index + 1;
-        // Top 7 teams make playoffs (as of 2020)
-        team.playoffSeed = index < 7 ? index + 1 : null;
-        team.inPlayoffs = index < 7;
+      });
+
+      // Separate division winners from non-winners
+      const divisionWinners = [];
+      const nonDivisionWinners = [];
+      
+      allTeams.forEach(team => {
+        if (team.divisionRank === 1) {
+          divisionWinners.push(team);
+        } else {
+          nonDivisionWinners.push(team);
+        }
+      });
+
+      // Sort division winners by win percentage, then points for
+      divisionWinners.sort((a, b) => {
+        if (b.winPercentage !== a.winPercentage) {
+          return b.winPercentage - a.winPercentage;
+        }
+        return b.pointsFor - a.pointsFor;
+      });
+
+      // Assign seeds 1-4 to division winners
+      divisionWinners.forEach((team, index) => {
+        team.playoffSeed = index + 1;
+        team.inPlayoffs = true;
+      });
+
+      // Sort non-division winners by win percentage, then points for
+      nonDivisionWinners.sort((a, b) => {
+        if (b.winPercentage !== a.winPercentage) {
+          return b.winPercentage - a.winPercentage;
+        }
+        return b.pointsFor - a.pointsFor;
+      });
+
+      // Assign seeds 5-7 to the top 3 non-division winners (wildcards)
+      nonDivisionWinners.forEach((team, index) => {
+        if (index < 3) {
+          team.playoffSeed = index + 5; // Seeds 5, 6, 7
+          team.inPlayoffs = true;
+        } else {
+          team.playoffSeed = null;
+          team.inPlayoffs = false;
+        }
       });
     });
 

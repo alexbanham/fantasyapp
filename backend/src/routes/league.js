@@ -1827,6 +1827,244 @@ router.get('/analytics/manager-score', async (req, res) => {
     });
   }
 });
+
+// Get boom/bust analytics for managers
+router.get('/analytics/boom-bust', async (req, res) => {
+  try {
+    const { seasonId } = req.query;
+    const config = await Config.getConfig();
+    const season = seasonId || config.currentSeason || 2025;
+    const leagueId = parseInt(process.env.ESPN_LEAGUE_ID);
+
+    // Get all player lines for the season
+    const allPlayerLines = await WeeklyPlayerLine.find({ 
+      league_id: leagueId, 
+      season 
+    }).lean();
+
+    // Get weekly team totals
+    const weeklyTotalsRaw = await WeeklyTeamTotals.find({ 
+      league_id: leagueId, 
+      season 
+    }).lean();
+
+    // Group player lines by team and week
+    const teamWeekData = new Map();
+    allPlayerLines.forEach(line => {
+      const key = `${line.team_id}-${line.week}`;
+      if (!teamWeekData.has(key)) {
+        teamWeekData.set(key, {
+          teamId: line.team_id,
+          week: line.week,
+          players: []
+        });
+      }
+      teamWeekData.get(key).players.push(line);
+    });
+
+    // Group weekly totals by team
+    const teamWeeklyScores = new Map();
+    weeklyTotalsRaw.forEach(w => {
+      const key = `${w.team_id}-${w.week}`;
+      if (!teamWeeklyScores.has(key)) {
+        teamWeeklyScores.set(key, 0);
+      }
+      teamWeeklyScores.set(key, teamWeeklyScores.get(key) + w.total_actual);
+    });
+
+    // Calculate stats for each team
+    const teamStatsMap = new Map();
+
+    // First pass: collect weekly scores to calculate averages
+    const teamWeeklyPoints = new Map();
+    teamWeekData.forEach((teamWeek, key) => {
+      if (!teamWeeklyPoints.has(teamWeek.teamId)) {
+        teamWeeklyPoints.set(teamWeek.teamId, []);
+      }
+      // Use actual starter points for consistency
+      const actualPoints = teamWeek.players
+        .filter(p => p.is_starter)
+        .reduce((sum, p) => sum + (p.points_actual || 0), 0);
+      teamWeeklyPoints.get(teamWeek.teamId).push({
+        week: teamWeek.week,
+        points: actualPoints
+      });
+    });
+
+    // Calculate team averages
+    const teamAverages = new Map();
+    teamWeeklyPoints.forEach((weeks, teamId) => {
+      const total = weeks.reduce((sum, w) => sum + w.points, 0);
+      const avg = weeks.length > 0 ? total / weeks.length : 0;
+      teamAverages.set(teamId, avg);
+    });
+
+    // Second pass: calculate boom/bust stats with details
+    teamWeekData.forEach((teamWeek, key) => {
+      if (!teamStatsMap.has(teamWeek.teamId)) {
+        teamStatsMap.set(teamWeek.teamId, {
+          teamId: teamWeek.teamId,
+          boomWeeks: 0,
+          bustWeeks: 0,
+          playerBooms: 0,
+          playerBusts: 0,
+          boomWeekDetails: [],
+          bustWeekDetails: [],
+          playerBoomDetails: [],
+          playerBustDetails: []
+        });
+      }
+      const stats = teamStatsMap.get(teamWeek.teamId);
+
+      // Calculate weekly score
+      const actualPoints = teamWeek.players
+        .filter(p => p.is_starter)
+        .reduce((sum, p) => sum + (p.points_actual || 0), 0);
+      
+      const teamAvg = teamAverages.get(teamWeek.teamId) || 0;
+      
+      // Determine if this is a boom or bust week
+      // Boom: >20 points above average AND >20% above average
+      // Bust: >20 points below average AND >20% below average
+      const diff = actualPoints - teamAvg;
+      const percentageDiff = teamAvg > 0 ? (diff / teamAvg) * 100 : 0;
+      
+      if (diff > 20 && percentageDiff > 20) {
+        stats.boomWeeks++;
+        stats.boomWeekDetails.push({
+          week: teamWeek.week,
+          points: Math.round(actualPoints * 10) / 10,
+          average: Math.round(teamAvg * 10) / 10,
+          diff: Math.round(diff * 10) / 10,
+          percentageDiff: Math.round(percentageDiff * 10) / 10
+        });
+      } else if (diff < -20 && percentageDiff < -20) {
+        stats.bustWeeks++;
+        stats.bustWeekDetails.push({
+          week: teamWeek.week,
+          points: Math.round(actualPoints * 10) / 10,
+          average: Math.round(teamAvg * 10) / 10,
+          diff: Math.round(diff * 10) / 10,
+          percentageDiff: Math.round(percentageDiff * 10) / 10
+        });
+      }
+
+      // Count individual player booms and busts with details
+      teamWeek.players.forEach(player => {
+        const actual = player.points_actual || 0;
+        const projected = player.points_projected || 0;
+        
+        if (projected > 0) {
+          const diff = actual - projected;
+          const percentage = (diff / projected) * 100;
+          
+          // Helper to get position label
+          const getPositionLabel = (posId) => {
+            if (posId === 1) return 'QB';
+            if (posId === 2) return 'RB';
+            if (posId === 3) return 'WR';
+            if (posId === 4) return 'TE';
+            if (posId === 16) return 'D/ST';
+            if (posId === 17) return 'K';
+            return 'UNK';
+          };
+          
+          // Boom: >10 points over AND >30% over
+          if (diff > 10 && percentage > 30) {
+            stats.playerBooms++;
+            stats.playerBoomDetails.push({
+              week: teamWeek.week,
+              playerId: player.player_id,
+              name: player.full_name || `Player ${player.player_id}`,
+              position: getPositionLabel(player.default_pos_id),
+              actual: Math.round(actual * 10) / 10,
+              projected: Math.round(projected * 10) / 10,
+              diff: Math.round(diff * 10) / 10,
+              percentage: Math.round(percentage * 10) / 10,
+              wasStarter: player.is_starter || false
+            });
+          }
+          // Bust: >10 points under AND >30% under (and projection was at least 10 points)
+          else if (diff < -10 && percentage < -30 && projected >= 10) {
+            stats.playerBusts++;
+            stats.playerBustDetails.push({
+              week: teamWeek.week,
+              playerId: player.player_id,
+              name: player.full_name || `Player ${player.player_id}`,
+              position: getPositionLabel(player.default_pos_id),
+              actual: Math.round(actual * 10) / 10,
+              projected: Math.round(projected * 10) / 10,
+              diff: Math.round(diff * 10) / 10,
+              percentage: Math.round(percentage * 10) / 10,
+              wasStarter: player.is_starter || false
+            });
+          }
+        }
+      });
+    });
+
+    // Get team names
+    const teams = await FantasyTeam.find({ league_id: leagueId, season }).lean();
+    const teamNamesMap = new Map();
+    teams.forEach(t => {
+      if (t.team_name) teamNamesMap.set(t.team_id, t.team_name);
+    });
+
+    const currentWeek = config.currentWeek || 1;
+    const comprehensiveResult = await espnService.getComprehensiveLeagueData(season, currentWeek);
+    const espnTeamsMap = new Map();
+    if (comprehensiveResult.teams) {
+      comprehensiveResult.teams.forEach(team => {
+        espnTeamsMap.set(team.teamId, { name: team.name, logo: team.logo });
+      });
+    }
+
+    // Format response
+    const data = Array.from(teamStatsMap.values()).map(stats => {
+      const espnData = espnTeamsMap.get(stats.teamId);
+      const teamName = espnData?.name || teamNamesMap.get(stats.teamId) || `Team ${stats.teamId}`;
+      
+      // Sort details by week
+      const sortedBoomWeeks = [...stats.boomWeekDetails].sort((a, b) => a.week - b.week);
+      const sortedBustWeeks = [...stats.bustWeekDetails].sort((a, b) => a.week - b.week);
+      const sortedPlayerBooms = [...stats.playerBoomDetails].sort((a, b) => {
+        if (a.week !== b.week) return a.week - b.week;
+        return b.diff - a.diff; // Sort by diff descending within same week
+      });
+      const sortedPlayerBusts = [...stats.playerBustDetails].sort((a, b) => {
+        if (a.week !== b.week) return a.week - b.week;
+        return a.diff - b.diff; // Sort by diff ascending (most negative first) within same week
+      });
+      
+      return {
+        teamId: stats.teamId,
+        teamName: teamName,
+        logo: espnData?.logo,
+        boomWeeks: stats.boomWeeks,
+        bustWeeks: stats.bustWeeks,
+        playerBooms: stats.playerBooms,
+        playerBusts: stats.playerBusts,
+        boomWeekDetails: sortedBoomWeeks,
+        bustWeekDetails: sortedBustWeeks,
+        playerBoomDetails: sortedPlayerBooms,
+        playerBustDetails: sortedPlayerBusts
+      };
+    });
+
+    res.json({
+      success: true,
+      season,
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch boom/bust analytics',
+      message: error.message
+    });
+  }
+});
+
 // Get position leaders (top teams at each position)
 router.get('/analytics/position-leaders', async (req, res) => {
   try {

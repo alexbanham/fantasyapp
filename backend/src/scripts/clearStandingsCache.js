@@ -53,3 +53,4 @@ async function clearStandingsCache() {
 // Run the script
 clearStandingsCache();
 
+

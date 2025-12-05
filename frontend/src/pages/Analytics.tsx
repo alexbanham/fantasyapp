@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, Trophy, AlertCircle, RefreshCw, X, ChevronRight, ChevronDown, Users, TrendingDown } from 'lucide-react'
+import { TrendingUp, Trophy, AlertCircle, RefreshCw, X, ChevronRight, ChevronDown, Users, TrendingDown, Zap, AlertTriangle } from 'lucide-react'
 import { Card } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
-import { getManagerScores, ManagerScore, getTeamWeeklyBreakdown, WeeklyBreakdownResponse, getWaiverWireAnalysis, WaiverWireAnalysis } from '../services/api'
+import { getManagerScores, ManagerScore, getTeamWeeklyBreakdown, WeeklyBreakdownResponse, getWaiverWireAnalysis, WaiverWireAnalysis, getBoomBustStats, BoomBustStats } from '../services/api'
 
 const Analytics = () => {
   const [managerScores, setManagerScores] = useState<ManagerScore[]>([])
@@ -17,10 +17,14 @@ const Analytics = () => {
   const [waiverWireData, setWaiverWireData] = useState<WaiverWireAnalysis | null>(null)
   const [loadingWaiverWire, setLoadingWaiverWire] = useState(false)
   const [expandedWaiverWeeks, setExpandedWaiverWeeks] = useState<Set<number>>(new Set())
+  const [boomBustStats, setBoomBustStats] = useState<BoomBustStats[]>([])
+  const [loadingBoomBust, setLoadingBoomBust] = useState(false)
+  const [expandedBoomBustTeams, setExpandedBoomBustTeams] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     fetchAnalytics()
     fetchWaiverWireAnalysis()
+    fetchBoomBustStats()
   }, [season])
 
   const fetchAnalytics = async () => {
@@ -51,6 +55,20 @@ const Analytics = () => {
       console.error('Failed to load waiver wire analysis:', err)
     } finally {
       setLoadingWaiverWire(false)
+    }
+  }
+
+  const fetchBoomBustStats = async () => {
+    try {
+      setLoadingBoomBust(true)
+      const data = await getBoomBustStats(season)
+      if (data.success) {
+        setBoomBustStats(data.data)
+      }
+    } catch (err) {
+      console.error('Failed to load boom/bust stats:', err)
+    } finally {
+      setLoadingBoomBust(false)
     }
   }
 
@@ -250,6 +268,7 @@ const Analytics = () => {
               <Button variant="ghost" size="sm" onClick={() => {
                 fetchAnalytics()
                 fetchWaiverWireAnalysis()
+                fetchBoomBustStats()
               }}>
                 <RefreshCw className="h-4 w-4" />
               </Button>
@@ -268,10 +287,12 @@ const Analytics = () => {
             {managerScores.map((team, idx) => (
               <Card 
                 key={team.teamId} 
-                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => handleTeamClick(team.teamId, team.teamName)}
+                className="p-4 hover:bg-accent/50 transition-colors"
               >
-                <div className="flex items-center justify-between">
+                <div 
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => handleTeamClick(team.teamId, team.teamName)}
+                >
                   <div className="flex items-center space-x-4">
                     {/* Rank Badge */}
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/20 text-primary font-bold">
@@ -332,6 +353,226 @@ const Analytics = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Boom/Bust Stats */}
+                {(() => {
+                  const stats = boomBustStats.find(s => s.teamId === team.teamId)
+                  if (!stats && !loadingBoomBust) return null
+                  
+                  const isExpanded = expandedBoomBustTeams.has(team.teamId)
+                  
+                  return (
+                    <div className="mt-4 pt-4 border-t">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const newExpanded = new Set(expandedBoomBustTeams)
+                          if (newExpanded.has(team.teamId)) {
+                            newExpanded.delete(team.teamId)
+                          } else {
+                            newExpanded.add(team.teamId)
+                          }
+                          setExpandedBoomBustTeams(newExpanded)
+                        }}
+                        className="w-full flex items-center justify-between mb-3 hover:bg-accent/30 rounded p-2 -m-2 transition-colors"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Zap className="h-4 w-4 text-green-500" />
+                          <AlertTriangle className="h-4 w-4 text-red-500" />
+                          <span className="text-xs font-semibold text-muted-foreground">Boom/Bust Analytics</span>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                      {loadingBoomBust ? (
+                        <div className="flex items-center justify-center py-2">
+                          <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                        </div>
+                      ) : stats ? (
+                        <>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                            <div>
+                              <div className="text-xs text-muted-foreground flex items-center space-x-1">
+                                <Zap className="h-3 w-3 text-green-500" />
+                                <span>Boom Weeks</span>
+                              </div>
+                              <div className="font-semibold text-green-500">{stats.boomWeeks}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground flex items-center space-x-1">
+                                <AlertTriangle className="h-3 w-3 text-red-500" />
+                                <span>Bust Weeks</span>
+                              </div>
+                              <div className="font-semibold text-red-500">{stats.bustWeeks}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground flex items-center space-x-1">
+                                <Zap className="h-3 w-3 text-green-500" />
+                                <span>Player Booms</span>
+                              </div>
+                              <div className="font-semibold text-green-600">{stats.playerBooms}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground flex items-center space-x-1">
+                                <AlertTriangle className="h-3 w-3 text-red-500" />
+                                <span>Player Busts</span>
+                              </div>
+                              <div className="font-semibold text-red-600">{stats.playerBusts}</div>
+                            </div>
+                          </div>
+
+                          {/* Expanded Details */}
+                          {isExpanded && (
+                            <div className="mt-4 space-y-4 pt-4 border-t">
+                              {/* Boom Weeks Details */}
+                              {stats.boomWeekDetails.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-semibold text-green-600 mb-2 flex items-center space-x-1">
+                                    <Zap className="h-4 w-4" />
+                                    <span>Boom Weeks ({stats.boomWeekDetails.length})</span>
+                                  </h4>
+                                  <div className="space-y-2">
+                                    {stats.boomWeekDetails.map((week, idx) => (
+                                      <div key={idx} className="flex items-center justify-between p-2 bg-green-500/10 rounded-lg border border-green-500/20">
+                                        <div className="flex items-center space-x-3">
+                                          <Badge variant="outline" className="text-xs">Week {week.week}</Badge>
+                                          <div className="text-sm">
+                                            <span className="font-semibold text-green-700">{formatScore(week.points)} pts</span>
+                                            <span className="text-xs text-muted-foreground ml-2">
+                                              (avg: {formatScore(week.average)})
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-sm font-semibold text-green-600">
+                                            +{formatScore(week.diff)} ({formatScore(week.percentageDiff)}%)
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Bust Weeks Details */}
+                              {stats.bustWeekDetails.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-semibold text-red-600 mb-2 flex items-center space-x-1">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <span>Bust Weeks ({stats.bustWeekDetails.length})</span>
+                                  </h4>
+                                  <div className="space-y-2">
+                                    {stats.bustWeekDetails.map((week, idx) => (
+                                      <div key={idx} className="flex items-center justify-between p-2 bg-red-500/10 rounded-lg border border-red-500/20">
+                                        <div className="flex items-center space-x-3">
+                                          <Badge variant="outline" className="text-xs">Week {week.week}</Badge>
+                                          <div className="text-sm">
+                                            <span className="font-semibold text-red-700">{formatScore(week.points)} pts</span>
+                                            <span className="text-xs text-muted-foreground ml-2">
+                                              (avg: {formatScore(week.average)})
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-sm font-semibold text-red-600">
+                                            {formatScore(week.diff)} ({formatScore(week.percentageDiff)}%)
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Player Booms Details */}
+                              {stats.playerBoomDetails.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-semibold text-green-600 mb-2 flex items-center space-x-1">
+                                    <Zap className="h-4 w-4" />
+                                    <span>Player Booms ({stats.playerBoomDetails.length})</span>
+                                  </h4>
+                                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                                    {stats.playerBoomDetails.map((player, idx) => (
+                                      <div key={idx} className="flex items-center justify-between p-2 bg-green-500/10 rounded-lg border border-green-500/20">
+                                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                          <Badge variant="outline" className="text-xs shrink-0">W{player.week}</Badge>
+                                          <div className="min-w-0 flex-1">
+                                            <div className="text-sm font-medium truncate">
+                                              {player.name}
+                                              {player.wasStarter && (
+                                                <Badge variant="secondary" className="ml-2 text-xs">Started</Badge>
+                                              )}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                              {player.position} • {formatScore(player.actual)} pts (proj: {formatScore(player.projected)})
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right shrink-0 ml-2">
+                                          <div className="text-sm font-semibold text-green-600">
+                                            +{formatScore(player.diff)} ({formatScore(player.percentage)}%)
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Player Busts Details */}
+                              {stats.playerBustDetails.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-semibold text-red-600 mb-2 flex items-center space-x-1">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <span>Player Busts ({stats.playerBustDetails.length})</span>
+                                  </h4>
+                                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                                    {stats.playerBustDetails.map((player, idx) => (
+                                      <div key={idx} className="flex items-center justify-between p-2 bg-red-500/10 rounded-lg border border-red-500/20">
+                                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                          <Badge variant="outline" className="text-xs shrink-0">W{player.week}</Badge>
+                                          <div className="min-w-0 flex-1">
+                                            <div className="text-sm font-medium truncate">
+                                              {player.name}
+                                              {player.wasStarter && (
+                                                <Badge variant="secondary" className="ml-2 text-xs">Started</Badge>
+                                              )}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                              {player.position} • {formatScore(player.actual)} pts (proj: {formatScore(player.projected)})
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right shrink-0 ml-2">
+                                          <div className="text-sm font-semibold text-red-600">
+                                            {formatScore(player.diff)} ({formatScore(player.percentage)}%)
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Empty State */}
+                              {stats.boomWeekDetails.length === 0 && 
+                               stats.bustWeekDetails.length === 0 && 
+                               stats.playerBoomDetails.length === 0 && 
+                               stats.playerBustDetails.length === 0 && (
+                                <div className="text-center py-4 text-sm text-muted-foreground">
+                                  No boom/bust data available
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      ) : null}
+                    </div>
+                  )
+                })()}
               </Card>
             ))}
           </div>
