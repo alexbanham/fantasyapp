@@ -427,7 +427,26 @@ router.get('/overview', async (req, res) => {
       const gamesPlayed = requestedWeek - 1; // Assuming week 1 is the start
       const gamesRemaining = Math.max(0, regularSeasonWeeks - gamesPlayed);
       
-      // Calculate playoff odds based on current position and remaining games
+      // Helper function to determine if team1 would finish ahead of team2 given their final records
+      // Considers tiebreakers: win percentage first, then points for
+      const wouldFinishAhead = (team1FinalWins, team1FinalLosses, team1PointsFor, 
+                                 team2FinalWins, team2FinalLosses, team2PointsFor) => {
+        const team1WinPct = team1FinalWins + team1FinalLosses > 0 
+          ? team1FinalWins / (team1FinalWins + team1FinalLosses) 
+          : 0;
+        const team2WinPct = team2FinalWins + team2FinalLosses > 0 
+          ? team2FinalWins / (team2FinalWins + team2FinalLosses) 
+          : 0;
+        
+        if (team1WinPct !== team2WinPct) {
+          return team1WinPct > team2WinPct;
+        }
+        // Tiebreaker: points for
+        return team1PointsFor > team2PointsFor;
+      };
+      
+      // Calculate playoff odds based on mathematical guarantees and probabilities
+      // This now properly considers tiebreakers (points for)
       const calculatePlayoffOdds = (team, index) => {
         try {
           // If season is over or playoffs have started, return based on current seed
@@ -435,50 +454,269 @@ router.get('/overview', async (req, res) => {
             return index < playoffTeams ? 100 : 0;
           }
           
-          // If we're already in playoffs position with games remaining
-          if (index < playoffTeams) {
-            // Higher odds if we're well ahead
-            const gamesAheadOfCutoff = playoffTeams - index;
-            if (gamesAheadOfCutoff >= 2) {
-              return Math.min(95, 70 + (gamesAheadOfCutoff * 10));
+          const currentWins = team.wins;
+          const currentLosses = team.losses;
+          const currentPointsFor = team.pointsFor;
+          const maxPossibleWins = currentWins + gamesRemaining;
+          const minWinsIfLoseAll = currentWins;
+          
+          // Estimate points for at end of season (simplified: assume average points per game continues)
+          // This is a rough estimate - in reality, points for depends on actual game outcomes
+          const gamesPlayed = currentWins + currentLosses;
+          const avgPointsPerGame = gamesPlayed > 0 ? currentPointsFor / gamesPlayed : 0;
+          const estimatedMaxPointsFor = currentPointsFor + (gamesRemaining * avgPointsPerGame);
+          const estimatedMinPointsFor = currentPointsFor; // If they lose all, points stay same
+          
+          // Step 1: Check if team is guaranteed to make playoffs (100%)
+          // A team is guaranteed if: even if they lose all remaining games, fewer than
+          // `playoffTeams` OTHER teams can finish ahead of them (considering tiebreakers)
+          let teamsThatCanFinishAheadIfWeLoseAll = 0;
+          
+          // Check each other team to see if they can finish ahead when this team loses all
+          for (let i = 0; i < standings.length; i++) {
+            if (i === index) continue; // Skip this team
+            
+            const otherTeam = standings[i];
+            const otherMaxWins = otherTeam.wins + gamesRemaining;
+            const otherMinWins = otherTeam.wins;
+            
+            // Estimate other team's points for
+            const otherGamesPlayed = otherTeam.wins + otherTeam.losses;
+            const otherAvgPointsPerGame = otherGamesPlayed > 0 ? otherTeam.pointsFor / otherGamesPlayed : 0;
+            const otherMaxPointsFor = otherTeam.pointsFor + (gamesRemaining * otherAvgPointsPerGame);
+            const otherMinPointsFor = otherTeam.pointsFor;
+            
+            // Can this other team finish ahead of us if we lose all remaining games?
+            // They finish ahead if:
+            // 1. They finish with more wins, OR
+            // 2. They finish with same wins but more points for
+            
+            const canFinishAhead = 
+              otherMaxWins > minWinsIfLoseAll || // More wins
+              (otherMaxWins === minWinsIfLoseAll && otherMaxPointsFor > estimatedMinPointsFor); // Same wins, more points
+            
+            if (canFinishAhead) {
+              teamsThatCanFinishAheadIfWeLoseAll++;
             }
-            // Good position but need to maintain
-            return Math.min(85, 60 + (gamesAheadOfCutoff * 15));
           }
           
-          // If we're just outside playoffs
-          if (index === playoffTeams) {
-            // Good chance if we're close
-            return 45;
+          // If fewer than `playoffTeams` teams can finish ahead, we're guaranteed
+          if (teamsThatCanFinishAheadIfWeLoseAll < playoffTeams) {
+            return 100; // Guaranteed playoff spot
           }
           
-          // Calculate how far behind we are
-          const teamsAhead = index - playoffTeams + 1;
-          // Safely get the cutoff team's record (the last team in playoffs)
+          // Step 2: Check if team is eliminated (0%)
+          // A team is eliminated ONLY if it's mathematically impossible to make playoffs
+          // This means: even if they win all remaining games, at least `playoffTeams` OTHER teams
+          // can finish ahead of them (considering tiebreakers)
+          // 
+          // IMPORTANT: We need to check if there are at least `playoffTeams` teams that can finish
+          // with STRICTLY better records (more wins, OR same wins but more points for)
+          // We can't just count teams that CAN finish ahead - we need to ensure that in ALL scenarios,
+          // at least `playoffTeams` teams will finish ahead
+          
+          // Build a list of all teams with their possible final records
+          // For each team, calculate their best and worst case scenarios
+          const teamScenarios = standings.map((otherTeam, otherIndex) => {
+            const otherMaxWins = otherTeam.wins + gamesRemaining;
+            const otherMinWins = otherTeam.wins;
+            const otherGamesPlayed = otherTeam.wins + otherTeam.losses;
+            const otherAvgPointsPerGame = otherGamesPlayed > 0 ? otherTeam.pointsFor / otherGamesPlayed : 0;
+            const otherMaxPointsFor = otherTeam.pointsFor + (gamesRemaining * otherAvgPointsPerGame);
+            const otherMinPointsFor = otherTeam.pointsFor;
+            
+            return {
+              index: otherIndex,
+              team: otherTeam,
+              maxWins: otherMaxWins,
+              minWins: otherMinWins,
+              maxPointsFor: otherMaxPointsFor,
+              minPointsFor: otherMinPointsFor,
+              currentWins: otherTeam.wins,
+              currentPointsFor: otherTeam.pointsFor
+            };
+          });
+          
+          // Sort teams by their best possible finish (max wins, then max points for)
+          // This helps us identify which teams are guaranteed to finish ahead
+          teamScenarios.sort((a, b) => {
+            if (b.maxWins !== a.maxWins) {
+              return b.maxWins - a.maxWins;
+            }
+            return b.maxPointsFor - a.maxPointsFor;
+          });
+          
+          // Count how many teams are GUARANTEED to finish ahead of us
+          // A team is guaranteed ahead if their WORST case (minWins) is better than our BEST case (maxPossibleWins),
+          // OR if their worst case ties us in wins but they have more points for in their worst case
+          let guaranteedAhead = 0;
+          
+          for (const scenario of teamScenarios) {
+            if (scenario.index === index) continue; // Skip ourselves
+            
+            // They're guaranteed ahead if:
+            // 1. Their minimum wins > our maximum wins, OR
+            // 2. Their minimum wins = our maximum wins AND their minimum points for > our maximum points for
+            const isGuaranteedAhead = 
+              scenario.minWins > maxPossibleWins ||
+              (scenario.minWins === maxPossibleWins && scenario.minPointsFor > estimatedMaxPointsFor);
+            
+            if (isGuaranteedAhead) {
+              guaranteedAhead++;
+            }
+          }
+          
+          // If at least `playoffTeams` teams are guaranteed to finish ahead, we're eliminated
+          if (guaranteedAhead >= playoffTeams) {
+            return 0; // Eliminated
+          }
+          
+          // Note: We don't eliminate teams just because they're behind - the probability
+          // calculation below will handle assigning low probabilities to teams that are unlikely
+          // to make playoffs. Only eliminate when it's mathematically impossible.
+          
+          // Step 3: Calculate probability for teams in between
+          // Use a combination of factors:
+          // - Current position relative to playoff cutoff
+          // - Games behind/ahead of cutoff
+          // - Remaining games
+          // - Number of teams competing for remaining spots
+          // - Tiebreaker advantage (points for)
+          
+          // Get cutoff team info if available
           const cutoffIndex = Math.min(playoffTeams - 1, standings.length - 1);
           const cutoffTeam = standings[cutoffIndex];
-          if (!cutoffTeam) {
-            return 0; // Can't calculate if no cutoff team
-          }
-          const gamesBehind = Math.max(0, (cutoffTeam.wins + cutoffTeam.losses) - (team.wins + team.losses));
+          const cutoffWins = cutoffTeam ? cutoffTeam.wins : currentWins;
+          const cutoffPointsFor = cutoffTeam ? cutoffTeam.pointsFor : currentPointsFor;
+          const winsBehindCutoff = cutoffWins - currentWins;
+          const teamsAhead = index - playoffTeams + 1;
           
-          // If we're too far behind
-          if (gamesBehind > gamesRemaining) {
-            return Math.max(0, 5);
+          // Check tiebreaker advantage: if we're behind in wins but ahead in points for,
+          // we have a better chance if we can catch up in wins
+          const pointsForAdvantage = currentPointsFor > cutoffPointsFor ? 1 : 0;
+          const pointsForDisadvantage = currentPointsFor < cutoffPointsFor ? 1 : 0;
+          
+          // Base probability based on position
+          let baseProbability = 0;
+          
+          if (index < playoffTeams) {
+            // Currently in playoff position
+            const positionInPlayoffs = playoffTeams - index; // 1 = last spot, higher = better
+            const cushion = positionInPlayoffs - 1;
+            
+            if (cushion >= 2) {
+              // Well positioned (2+ spots ahead of cutoff)
+              baseProbability = 85 + (cushion * 3); // 85-94%
+            } else if (cushion === 1) {
+              // Just ahead of cutoff
+              baseProbability = 70;
+            } else {
+              // Last playoff spot - check if we have tiebreaker advantage
+              // But also check if teams behind us can catch up and beat us on tiebreaker
+              if (pointsForAdvantage) {
+                baseProbability = 60; // Slightly higher if we have points advantage
+              } else if (pointsForDisadvantage) {
+                // Check if any team behind us can catch up and beat us on tiebreaker
+                let teamsThatCanBeatUsOnTiebreaker = 0;
+                for (let i = index + 1; i < standings.length; i++) {
+                  const teamBehind = standings[i];
+                  const teamBehindMaxWins = teamBehind.wins + gamesRemaining;
+                  // If they can tie us in wins and have more points for, they can beat us
+                  if (teamBehindMaxWins >= currentWins && teamBehind.pointsFor > currentPointsFor) {
+                    teamsThatCanBeatUsOnTiebreaker++;
+                  }
+                }
+                // If multiple teams can beat us on tiebreaker, lower our odds
+                if (teamsThatCanBeatUsOnTiebreaker > 0) {
+                  baseProbability = Math.max(45, 55 - (teamsThatCanBeatUsOnTiebreaker * 5));
+                } else {
+                  baseProbability = 50;
+                }
+              } else {
+                baseProbability = 55;
+              }
+            }
+          } else {
+            // Currently outside playoff position
+            const spotsOutside = index - playoffTeams + 1; // 1 = first team out
+            
+            // Calculate how many wins behind/ahead of cutoff
+            const effectiveWinsBehind = Math.max(0, winsBehindCutoff);
+            
+            if (spotsOutside === 1) {
+              // First team out - good chance
+              if (effectiveWinsBehind === 0) {
+                // Tied with cutoff - tiebreaker matters a lot here
+                baseProbability = pointsForAdvantage ? 55 : (pointsForDisadvantage ? 45 : 50);
+              } else if (effectiveWinsBehind === 1) {
+                // One win behind - can catch up, tiebreaker helps significantly
+                // If we have significantly more points for, we have a very good chance if we catch up
+                if (pointsForAdvantage && currentPointsFor > cutoffPointsFor * 1.05) {
+                  // We're one win behind but have 5%+ more points - excellent chance if we catch up
+                  baseProbability = 60; // Higher than the team currently in the spot
+                } else if (pointsForAdvantage) {
+                  baseProbability = 50;
+                } else {
+                  baseProbability = 40;
+                }
+              } else if (effectiveWinsBehind === 2) {
+                baseProbability = 30;
+              } else if (effectiveWinsBehind === 3) {
+                baseProbability = 20;
+              } else {
+                baseProbability = Math.max(10, 20 - (effectiveWinsBehind - 3) * 3);
+              }
+            } else if (spotsOutside === 2) {
+              // Second team out
+              if (effectiveWinsBehind <= 1) {
+                baseProbability = pointsForAdvantage ? 30 : 20;
+              } else if (effectiveWinsBehind === 2) {
+                baseProbability = 15;
+              } else if (effectiveWinsBehind === 3) {
+                baseProbability = 10;
+              } else {
+                baseProbability = Math.max(5, 10 - (effectiveWinsBehind - 3) * 2);
+              }
+            } else if (spotsOutside === 3) {
+              // Third team out
+              if (effectiveWinsBehind <= 1) {
+                baseProbability = 12;
+              } else if (effectiveWinsBehind === 2) {
+                baseProbability = 8;
+              } else {
+                baseProbability = Math.max(3, 8 - (effectiveWinsBehind - 2) * 2);
+              }
+            } else {
+              // Further out - still give some chance if not too far behind
+              const maxSpotsOutside = Math.min(spotsOutside, 6); // Cap at 6 spots out
+              const baseChance = Math.max(2, 8 - (maxSpotsOutside - 3) * 1.5);
+              // Reduce further based on wins behind
+              baseProbability = Math.max(1, baseChance - Math.max(0, effectiveWinsBehind - 2) * 1.5);
+            }
+            
+            // Special case: if we're one win behind but have significantly more points for,
+            // we have a better chance if we can catch up (applies to any position)
+            // This handles the scenario where a 5-8 team with way more points than 6-7 teams
+            // can catch up and win the tiebreaker
+            if (effectiveWinsBehind === 1 && pointsForAdvantage && currentPointsFor > cutoffPointsFor * 1.05) {
+              // Boost probability significantly - we can catch up and win tiebreaker
+              baseProbability = Math.min(100, Math.max(baseProbability, 50 + (spotsOutside === 1 ? 10 : spotsOutside === 2 ? 5 : 0)));
+            }
           }
           
-          // If we're 1-2 games behind
-          if (gamesBehind <= 2 && teamsAhead <= 2) {
-            return Math.max(15, 40 - (teamsAhead * 10) - (gamesBehind * 5));
+          // Adjust for remaining games
+          // More games remaining = more uncertainty = adjust probability toward 50%
+          if (gamesRemaining > 0) {
+            const uncertaintyFactor = Math.min(0.3, gamesRemaining / regularSeasonWeeks);
+            if (baseProbability > 50) {
+              baseProbability = baseProbability - (uncertaintyFactor * (baseProbability - 50));
+            } else {
+              baseProbability = baseProbability + (uncertaintyFactor * (50 - baseProbability));
+            }
           }
           
-          // If we're 3+ games behind or many teams ahead
-          if (gamesBehind <= gamesRemaining && teamsAhead <= 3) {
-            return Math.max(5, 25 - (teamsAhead * 5) - (gamesBehind * 3));
-          }
-          
-          // Very low odds
-          return Math.max(0, 10 - (teamsAhead * 2) - (gamesBehind * 2));
+          // Ensure probability is between 0 and 100
+          return Math.max(0, Math.min(100, Math.round(baseProbability)));
         } catch (err) {
           if (process.env.NODE_ENV === 'development') {
             console.error('Error calculating playoff odds for team:', team.teamId, err);

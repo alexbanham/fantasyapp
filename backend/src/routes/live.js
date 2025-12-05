@@ -1459,4 +1459,45 @@ router.post('/poll', async (req, res) => {
   }
 });
 
+// POST /api/live/games/sync-boxscores - Force boxscore sync for current week
+router.post('/sync-boxscores', async (req, res) => {
+  try {
+    const config = await Config.getConfig();
+    const season = config.currentSeason || 2025;
+    const week = config.currentWeek || 1;
+    
+    const result = await gamePollingService.forceBoxscoreSync(season, week);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Boxscore sync completed',
+        data: {
+          season,
+          week,
+          playerLines: result.playerLines || 0,
+          teamTotals: result.teamTotals || 0,
+          matchups: result.matchups || 0
+        },
+        status: gamePollingService.getStatus()
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.error || 'Boxscore sync failed',
+        status: gamePollingService.getStatus()
+      });
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error syncing boxscores:', error);
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Failed to sync boxscores',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
+    });
+  }
+});
+
 module.exports = router;

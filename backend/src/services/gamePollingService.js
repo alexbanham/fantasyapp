@@ -2,6 +2,8 @@ const cron = require('node-cron');
 const Game = require('../models/Game');
 const Config = require('../models/Config');
 const espnService = require('../services/espnService');
+const boxscoreSync = require('./boxscoreSync');
+
 class GamePollingService {
   constructor() {
     this.isPolling = false;
@@ -12,6 +14,13 @@ class GamePollingService {
     this.lastPollTime = null;
     this.consecutiveErrors = 0;
     this.maxConsecutiveErrors = parseInt(process.env.GAME_POLL_MAX_CONSECUTIVE_ERRORS);
+    
+    // Boxscore sync settings
+    this.lastBoxscoreSyncTime = null;
+    // Configurable boxscore sync interval (default: 2 minutes when games are live)
+    this.boxscoreSyncInterval = parseInt(process.env.BOXSCORE_SYNC_INTERVAL) || (2 * 60 * 1000);
+    this.boxscoreSyncInProgress = false;
+    
     // Validate required environment variables
     this.validateEnvironment();
   }
@@ -118,6 +127,8 @@ class GamePollingService {
       // Process each game
       let updatedCount = 0;
       let newCount = 0;
+      let hasLiveGames = false;
+      
       for (const gameData of games) {
         try {
           const result = await this.processGame(gameData);
@@ -126,16 +137,27 @@ class GamePollingService {
           } else if (result.isUpdated) {
             updatedCount++;
           }
+          // Check if this game is live
+          if (gameData.isLive || gameData.status === 'in') {
+            hasLiveGames = true;
+          }
         } catch (error) {
           console.error('Error processing game:', error);
         }
       }
+      
+      // If there are live games, sync boxscores to update player scores and projections
+      if (hasLiveGames) {
+        await this.syncBoxscoresIfNeeded(weekInfo.season, weekInfo.week);
+      }
+      
       // Cleanup: Mark old games as not live if they haven't been updated recently
       await this.cleanupOldLiveGames();
       // Reset error counter on successful poll
       this.consecutiveErrors = 0;
       this.lastPollTime = new Date();
     } catch (error) {
+      console.error('[GamePolling] Error in poll:', error);
       this.consecutiveErrors++;
       // Don't stop completely, just use longer intervals
       if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
@@ -148,6 +170,39 @@ class GamePollingService {
     }
     // Schedule next poll
     this.schedulePolling();
+  }
+  
+  // Sync boxscores if enough time has passed since last sync
+  async syncBoxscoresIfNeeded(season, week) {
+    // Don't sync if already in progress
+    if (this.boxscoreSyncInProgress) {
+      return;
+    }
+    
+    const now = new Date();
+    const timeSinceLastSync = this.lastBoxscoreSyncTime 
+      ? now - this.lastBoxscoreSyncTime 
+      : Infinity;
+    
+    // Sync if enough time has passed (or never synced)
+    if (timeSinceLastSync >= this.boxscoreSyncInterval) {
+      this.boxscoreSyncInProgress = true;
+      try {
+        console.log(`[GamePolling] Syncing boxscores for week ${week}, season ${season}...`);
+        const result = await boxscoreSync.syncWeek(season, week);
+        
+        if (result.success) {
+          console.log(`[GamePolling] Boxscore sync successful: ${result.playerLines} player lines, ${result.teamTotals} team totals`);
+          this.lastBoxscoreSyncTime = now;
+        } else {
+          console.error(`[GamePolling] Boxscore sync failed: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('[GamePolling] Error syncing boxscores:', error);
+      } finally {
+        this.boxscoreSyncInProgress = false;
+      }
+    }
   }
   // Process individual game data
   async processGame(gameData) {
@@ -228,8 +283,30 @@ class GamePollingService {
       currentInterval: this.currentInterval,
       lastPollTime: this.lastPollTime,
       consecutiveErrors: this.consecutiveErrors,
-      nextPollIn: this.pollTimer ? this.currentInterval : null
+      nextPollIn: this.pollTimer ? this.currentInterval : null,
+      lastBoxscoreSyncTime: this.lastBoxscoreSyncTime,
+      boxscoreSyncInProgress: this.boxscoreSyncInProgress
     };
+  }
+  
+  // Force a boxscore sync (for manual triggers)
+  async forceBoxscoreSync(season, week) {
+    if (this.boxscoreSyncInProgress) {
+      return { success: false, error: 'Boxscore sync already in progress' };
+    }
+    
+    this.boxscoreSyncInProgress = true;
+    try {
+      const result = await boxscoreSync.syncWeek(season, week);
+      if (result.success) {
+        this.lastBoxscoreSyncTime = new Date();
+      }
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    } finally {
+      this.boxscoreSyncInProgress = false;
+    }
   }
 }
 // Create singleton instance

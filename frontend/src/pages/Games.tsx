@@ -287,7 +287,7 @@ const Games = () => {
     
     try {
       setLoadingStandings(true)
-      const response = await getNFLStandings(currentSeason)
+      const response = await getNFLStandings(currentSeason ?? undefined)
       if (response.success) {
         setStandings(response)
         // Cache the response
@@ -304,7 +304,7 @@ const Games = () => {
   const fetchPlayoffScenarios = useCallback(async (teamAbbr: string) => {
     try {
       setLoadingScenarios(true)
-      const response = await getPlayoffScenarios(teamAbbr, currentSeason, currentWeek)
+      const response = await getPlayoffScenarios(teamAbbr, currentSeason ?? undefined, currentWeek ?? undefined)
       if (response.success) {
         setPlayoffScenarios(response)
       }
@@ -498,7 +498,7 @@ const Games = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => fetchGames(currentWeek, currentSeason)}
+                onClick={() => fetchGames(currentWeek ?? 1, currentSeason ?? undefined)}
                 disabled={loading}
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
