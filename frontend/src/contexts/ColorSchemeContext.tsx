@@ -15,9 +15,9 @@ interface ColorSchemeProviderProps {
 
 export const ColorSchemeProvider: React.FC<ColorSchemeProviderProps> = ({ children }) => {
   const [colorScheme, setColorScheme] = useState<ColorScheme>(() => {
-    // Check localStorage first, then default to purple
+    // Check localStorage first, then default to christmas
     const saved = localStorage.getItem('colorScheme') as ColorScheme
-    return saved || 'purple'
+    return saved || 'christmas'
   })
 
   useEffect(() => {
