@@ -4,8 +4,30 @@ type NodeJSTimeout = ReturnType<typeof setInterval>
 import { Clock, Wifi, WifiOff, RefreshCw, ChevronDown, ChevronUp, Play, Pause, Trophy, MapPin, Calendar } from 'lucide-react'
 import { Card, CardContent } from './ui/card'
 import { Button } from './ui/button'
-import { getTeamLogoWithFallback } from '../lib/teamLogos'
+import { getTeamLogoWithFallback, getDSTTeamAbbr } from '../lib/teamLogos'
 import { getCache, setCache } from '../lib/cache'
+import PlayerScoringBreakdownModal from './PlayerScoringBreakdownModal'
+
+interface PlayerStats {
+  passingYards?: number
+  passingTouchdowns?: number
+  passingInterceptions?: number
+  rushingYards?: number
+  rushingTouchdowns?: number
+  receivingYards?: number
+  receivingReceptions?: number
+  receivingTouchdowns?: number
+  lostFumbles?: number
+  fieldGoalsMade?: number
+  fieldGoalsAttempted?: number
+  extraPointsMade?: number
+  sacks?: number
+  interceptions?: number
+  fumbleRecoveries?: number
+  defensiveTouchdowns?: number
+  pointsAllowed?: number
+  yardsAllowed?: number
+}
 
 interface TopScorer {
   espnId: string
@@ -21,7 +43,7 @@ interface TopScorer {
   roster_status?: 'free_agent' | 'rostered' | 'unknown'
   fantasy_team_id?: number | null
   fantasy_team_name?: string | null
-  stats?: any
+  stats?: PlayerStats
 }
 
 interface Game {
@@ -72,6 +94,8 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
   const [scoreAnimations, setScoreAnimations] = useState<Map<string, { away: boolean; home: boolean }>>(new Map())
   const [topScorers, setTopScorers] = useState<Map<string, { homePlayers: TopScorer[], awayPlayers: TopScorer[] }>>(new Map())
   const [loadingScorers, setLoadingScorers] = useState<Set<string>>(new Set())
+  const [selectedPlayer, setSelectedPlayer] = useState<TopScorer | null>(null)
+  const [breakdownModalOpen, setBreakdownModalOpen] = useState(false)
   const expandedGamesRef = useRef<Set<string>>(new Set())
   const loadingScorersRef = useRef<Set<string>>(new Set())
   const onLiveGamesRefreshRef = useRef(onLiveGamesRefresh)
@@ -704,15 +728,20 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                             <h4 className="text-xs sm:text-sm font-semibold text-foreground flex items-center space-x-1.5 sm:space-x-2">
                               <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 shrink-0" />
                               <span>Top Fantasy Scorers</span>
+                              {loadingScorers.has(game.eventId) && (
+                                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin text-muted-foreground ml-1" />
+                              )}
                             </h4>
                             
-                            {loadingScorers.has(game.eventId) && (
+                            {/* Show loading message only if no data exists yet */}
+                            {loadingScorers.has(game.eventId) && !topScorers.has(game.eventId) && (
                               <div className="flex items-center justify-center py-4 sm:py-6">
                                 <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin text-muted-foreground mr-2" />
                                 <span className="text-xs sm:text-sm text-muted-foreground">Loading top scorers...</span>
                               </div>
                             )}
                             
+                            {/* Show "no data" message only when not loading and no data exists */}
                             {!loadingScorers.has(game.eventId) && topScorers.has(game.eventId) && 
                              (!topScorers.get(game.eventId)?.homePlayers?.length && !topScorers.get(game.eventId)?.awayPlayers?.length) && (
                               <div className="text-center py-3 sm:py-4 text-xs sm:text-sm text-muted-foreground">
@@ -720,9 +749,10 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                               </div>
                             )}
                             
+                            {/* Show scorers even when loading (if data exists) */}
                             {(() => {
                               const scorers = topScorers.get(game.eventId)
-                              return !loadingScorers.has(game.eventId) && topScorers.has(game.eventId) && scorers &&
+                              return topScorers.has(game.eventId) && scorers &&
                                ((scorers.homePlayers?.length ?? 0) > 0 || (scorers.awayPlayers?.length ?? 0) > 0)
                             })() && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
@@ -745,21 +775,28 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                                           }`}
                                         >
                                           <div className="flex items-center space-x-2 flex-1 min-w-0">
-                                            {(scorer.position === 'DST' || scorer.position === 'D/ST') && scorer.proTeamId ? (
-                                              <img 
-                                                src={getTeamLogoWithFallback(scorer.proTeamId)} 
-                                                alt={scorer.name}
-                                                className="w-6 h-6 rounded-full object-cover border border-border/30 flex-shrink-0"
-                                                onError={(e) => {
-                                                  const target = e.target as HTMLImageElement;
-                                                  target.style.display = 'none';
-                                                  const parent = target.parentElement;
-                                                  if (parent) {
-                                                    parent.innerHTML = `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-300 text-[10px]">${scorer.name.charAt(0)}</span></div>`;
-                                                  }
-                                                }}
-                                              />
-                                            ) : scorer.headshot_url ? (
+                                            {(scorer.position === 'DST' || scorer.position === 'D/ST') ? (() => {
+                                              const teamAbbr = getDSTTeamAbbr(scorer);
+                                              return teamAbbr ? (
+                                                <img 
+                                                  src={getTeamLogoWithFallback(teamAbbr)} 
+                                                  alt={scorer.name}
+                                                  className="w-6 h-6 rounded-full object-cover border border-border/30 flex-shrink-0"
+                                                  onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.style.display = 'none';
+                                                    const parent = target.parentElement;
+                                                    if (parent) {
+                                                      parent.innerHTML = `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-300 text-[10px]">${scorer.name.charAt(0)}</span></div>`;
+                                                    }
+                                                  }}
+                                                />
+                                              ) : (
+                                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
+                                                  <span className="text-xs font-bold text-blue-300 text-[10px]">{scorer.name.charAt(0)}</span>
+                                                </div>
+                                              );
+                                            })() : scorer.headshot_url ? (
                                               <img 
                                                 src={scorer.headshot_url} 
                                                 alt={scorer.name}
@@ -785,9 +822,16 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                                               </div>
                                             </div>
                                           </div>
-                                          <div className="flex items-center bg-green-500/10 px-2 py-1 rounded border border-green-500/20 ml-1">
+                                          <button
+                                            onClick={() => {
+                                              setSelectedPlayer(scorer)
+                                              setBreakdownModalOpen(true)
+                                            }}
+                                            className="flex items-center bg-green-500/10 px-2 py-1 rounded border border-green-500/20 ml-1 hover:bg-green-500/20 transition-colors cursor-pointer"
+                                            title="Click to view scoring breakdown"
+                                          >
                                             <span className="text-xs font-bold text-green-400">{scorer.fantasyPoints.toFixed(1)}</span>
-                                          </div>
+                                          </button>
                                         </div>
                                       ))}
                                     </div>
@@ -813,21 +857,28 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                                           }`}
                                         >
                                           <div className="flex items-center space-x-2 flex-1 min-w-0">
-                                            {(scorer.position === 'DST' || scorer.position === 'D/ST') && scorer.proTeamId ? (
-                                              <img 
-                                                src={getTeamLogoWithFallback(scorer.proTeamId)} 
-                                                alt={scorer.name}
-                                                className="w-6 h-6 rounded-full object-cover border border-border/30 flex-shrink-0"
-                                                onError={(e) => {
-                                                  const target = e.target as HTMLImageElement;
-                                                  target.style.display = 'none';
-                                                  const parent = target.parentElement;
-                                                  if (parent) {
-                                                    parent.innerHTML = `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500/20 to-purple-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-emerald-300 text-[10px]">${scorer.name.charAt(0)}</span></div>`;
-                                                  }
-                                                }}
-                                              />
-                                            ) : scorer.headshot_url ? (
+                                            {(scorer.position === 'DST' || scorer.position === 'D/ST') ? (() => {
+                                              const teamAbbr = getDSTTeamAbbr(scorer);
+                                              return teamAbbr ? (
+                                                <img 
+                                                  src={getTeamLogoWithFallback(teamAbbr)} 
+                                                  alt={scorer.name}
+                                                  className="w-6 h-6 rounded-full object-cover border border-border/30 flex-shrink-0"
+                                                  onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.style.display = 'none';
+                                                    const parent = target.parentElement;
+                                                    if (parent) {
+                                                      parent.innerHTML = `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500/20 to-purple-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-emerald-300 text-[10px]">${scorer.name.charAt(0)}</span></div>`;
+                                                    }
+                                                  }}
+                                                />
+                                              ) : (
+                                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500/20 to-purple-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                                                  <span className="text-xs font-bold text-emerald-300 text-[10px]">{scorer.name.charAt(0)}</span>
+                                                </div>
+                                              );
+                                            })() : scorer.headshot_url ? (
                                               <img 
                                                 src={scorer.headshot_url} 
                                                 alt={scorer.name}
@@ -853,9 +904,16 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
                                               </div>
                                             </div>
                                           </div>
-                                          <div className="flex items-center bg-green-500/10 px-2 py-1 rounded border border-green-500/20 ml-1">
+                                          <button
+                                            onClick={() => {
+                                              setSelectedPlayer(scorer)
+                                              setBreakdownModalOpen(true)
+                                            }}
+                                            className="flex items-center bg-green-500/10 px-2 py-1 rounded border border-green-500/20 ml-1 hover:bg-green-500/20 transition-colors cursor-pointer"
+                                            title="Click to view scoring breakdown"
+                                          >
                                             <span className="text-xs font-bold text-green-400">{scorer.fantasyPoints.toFixed(1)}</span>
-                                          </div>
+                                          </button>
                                         </div>
                                       ))}
                                     </div>
@@ -896,6 +954,16 @@ const LiveScoreStrip = ({ className = '', isPollingActive = false, onLiveGamesRe
           </div>
         )}
       </CardContent>
+
+      {/* Scoring Breakdown Modal */}
+      <PlayerScoringBreakdownModal
+        isOpen={breakdownModalOpen}
+        onClose={() => {
+          setBreakdownModalOpen(false)
+          setSelectedPlayer(null)
+        }}
+        player={selectedPlayer}
+      />
     </Card>
   )
 }

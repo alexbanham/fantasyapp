@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Clock, RefreshCw, ChevronDown, ChevronUp, Trophy, MapPin, Calendar } from 'lucide-react'
 import { Card, CardContent } from './ui/card'
 import { Button } from './ui/button'
-import { getTeamLogoWithFallback } from '../lib/teamLogos'
+import { getTeamLogoWithFallback, getDSTTeamAbbr } from '../lib/teamLogos'
 import { getLiveGames } from '../services/api'
 
 interface TopScorer {
@@ -440,21 +440,28 @@ const RecentGames = ({ className = '', currentWeek, currentSeason }: RecentGames
                                         }`}
                                       >
                                         <div className="flex items-center space-x-2 flex-1 min-w-0">
-                                          {(scorer.position === 'DST' || scorer.position === 'D/ST') && scorer.proTeamId ? (
-                                            <img 
-                                              src={getTeamLogoWithFallback(scorer.proTeamId)} 
-                                              alt={scorer.name}
-                                              className="w-6 h-6 rounded-full object-cover border border-border/30 flex-shrink-0"
-                                              onError={(e) => {
-                                                const target = e.target as HTMLImageElement;
-                                                target.style.display = 'none';
-                                                const parent = target.parentElement;
-                                                if (parent) {
-                                                  parent.innerHTML = `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-300 text-[10px]">${scorer.name.charAt(0)}</span></div>`;
-                                                }
-                                              }}
-                                            />
-                                          ) : scorer.headshot_url ? (
+                                          {(scorer.position === 'DST' || scorer.position === 'D/ST') ? (() => {
+                                            const teamAbbr = getDSTTeamAbbr(scorer);
+                                            return teamAbbr ? (
+                                              <img 
+                                                src={getTeamLogoWithFallback(teamAbbr)} 
+                                                alt={scorer.name}
+                                                className="w-6 h-6 rounded-full object-cover border border-border/30 flex-shrink-0"
+                                                onError={(e) => {
+                                                  const target = e.target as HTMLImageElement;
+                                                  target.style.display = 'none';
+                                                  const parent = target.parentElement;
+                                                  if (parent) {
+                                                    parent.innerHTML = `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-300 text-[10px]">${scorer.name.charAt(0)}</span></div>`;
+                                                  }
+                                                }}
+                                              />
+                                            ) : (
+                                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
+                                                <span className="text-xs font-bold text-blue-300 text-[10px]">{scorer.name.charAt(0)}</span>
+                                              </div>
+                                            );
+                                          })() : scorer.headshot_url ? (
                                             <img 
                                               src={scorer.headshot_url} 
                                               alt={scorer.name}
@@ -508,21 +515,28 @@ const RecentGames = ({ className = '', currentWeek, currentSeason }: RecentGames
                                         }`}
                                       >
                                         <div className="flex items-center space-x-2 flex-1 min-w-0">
-                                          {(scorer.position === 'DST' || scorer.position === 'D/ST') && scorer.proTeamId ? (
-                                            <img 
-                                              src={getTeamLogoWithFallback(scorer.proTeamId)} 
-                                              alt={scorer.name}
-                                              className="w-6 h-6 rounded-full object-cover border border-border/30 flex-shrink-0"
-                                              onError={(e) => {
-                                                const target = e.target as HTMLImageElement;
-                                                target.style.display = 'none';
-                                                const parent = target.parentElement;
-                                                if (parent) {
-                                                  parent.innerHTML = `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500/20 to-purple-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-emerald-300 text-[10px]">${scorer.name.charAt(0)}</span></div>`;
-                                                }
-                                              }}
-                                            />
-                                          ) : scorer.headshot_url ? (
+                                          {(scorer.position === 'DST' || scorer.position === 'D/ST') ? (() => {
+                                            const teamAbbr = getDSTTeamAbbr(scorer);
+                                            return teamAbbr ? (
+                                              <img 
+                                                src={getTeamLogoWithFallback(teamAbbr)} 
+                                                alt={scorer.name}
+                                                className="w-6 h-6 rounded-full object-cover border border-border/30 flex-shrink-0"
+                                                onError={(e) => {
+                                                  const target = e.target as HTMLImageElement;
+                                                  target.style.display = 'none';
+                                                  const parent = target.parentElement;
+                                                  if (parent) {
+                                                    parent.innerHTML = `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500/20 to-purple-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-emerald-300 text-[10px]">${scorer.name.charAt(0)}</span></div>`;
+                                                  }
+                                                }}
+                                              />
+                                            ) : (
+                                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500/20 to-purple-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                                                <span className="text-xs font-bold text-emerald-300 text-[10px]">{scorer.name.charAt(0)}</span>
+                                              </div>
+                                            );
+                                          })() : scorer.headshot_url ? (
                                             <img 
                                               src={scorer.headshot_url} 
                                               alt={scorer.name}
@@ -573,4 +587,7 @@ const RecentGames = ({ className = '', currentWeek, currentSeason }: RecentGames
 }
 
 export default RecentGames
+
+
+
 

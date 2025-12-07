@@ -21,7 +21,7 @@ import { getGamesByWeek, getLiveGames, getConfig, getGameScorers, getNFLStanding
 import { getCache, setCache } from '../lib/cache'
 import { useColorScheme } from '../contexts/ColorSchemeContext'
 import { getBackgroundClass } from '../lib/colorSchemes'
-import { getTeamLogoWithFallback } from '../lib/teamLogos'
+import { getTeamLogoWithFallback, getDSTTeamAbbr } from '../lib/teamLogos'
 
 interface Game {
   eventId: string
@@ -699,21 +699,28 @@ const Games = () => {
                       }`}
                     >
                       <div className="flex items-center space-x-1.5 flex-1 min-w-0">
-                        {(player.position === 'DST' || player.position === 'D/ST') && player.proTeamId ? (
-                          <img
-                            src={getTeamLogoWithFallback(player.proTeamId)}
-                            alt={player.name}
-                            className="w-5 h-5 rounded-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                              const parent = target.parentElement;
-                              if (parent) {
-                                parent.innerHTML = `<div class="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center text-[8px] font-bold">${player.name.charAt(0)}</div>`;
-                              }
-                            }}
-                          />
-                        ) : player.headshot_url ? (
+                        {(player.position === 'DST' || player.position === 'D/ST') ? (() => {
+                          const teamAbbr = getDSTTeamAbbr(player);
+                          return teamAbbr ? (
+                            <img
+                              src={getTeamLogoWithFallback(teamAbbr)}
+                              alt={player.name}
+                              className="w-5 h-5 rounded-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  parent.innerHTML = `<div class="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center text-[8px] font-bold">${player.name.charAt(0)}</div>`;
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center text-[8px] font-bold">
+                              {player.name.charAt(0)}
+                            </div>
+                          );
+                        })() : player.headshot_url ? (
                           <img
                             src={player.headshot_url}
                             alt={player.name}
@@ -1207,21 +1214,28 @@ const Games = () => {
                         gameScorers.awayPlayers.map((player, index) => (
                           <div key={index} className="flex items-center justify-between p-3 bg-accent rounded-lg">
                             <div className="flex items-center space-x-2">
-                              {(player.position === 'DST' || player.position === 'D/ST') && player.proTeamId ? (
-                                <img 
-                                  src={getTeamLogoWithFallback(player.proTeamId)} 
-                                  alt={player.name} 
-                                  className="w-8 h-8 rounded-full object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = 'none';
-                                    const parent = target.parentElement;
-                                    if (parent) {
-                                      parent.innerHTML = `<div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold">${player.name.charAt(0)}</div>`;
-                                    }
-                                  }}
-                                />
-                              ) : player.headshot_url ? (
+                              {(player.position === 'DST' || player.position === 'D/ST') ? (() => {
+                                const teamAbbr = getDSTTeamAbbr(player);
+                                return teamAbbr ? (
+                                  <img 
+                                    src={getTeamLogoWithFallback(teamAbbr)} 
+                                    alt={player.name} 
+                                    className="w-8 h-8 rounded-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                      const parent = target.parentElement;
+                                      if (parent) {
+                                        parent.innerHTML = `<div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold">${player.name.charAt(0)}</div>`;
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold">
+                                    {player.name.charAt(0)}
+                                  </div>
+                                );
+                              })() : player.headshot_url ? (
                                 <img src={player.headshot_url} alt={player.name} className="w-8 h-8 rounded-full" />
                               ) : (
                                 <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold">
@@ -1263,21 +1277,28 @@ const Games = () => {
                         gameScorers.homePlayers.map((player, index) => (
                           <div key={index} className="flex items-center justify-between p-3 bg-accent rounded-lg">
                             <div className="flex items-center space-x-2">
-                              {(player.position === 'DST' || player.position === 'D/ST') && player.proTeamId ? (
-                                <img 
-                                  src={getTeamLogoWithFallback(player.proTeamId)} 
-                                  alt={player.name} 
-                                  className="w-8 h-8 rounded-full object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = 'none';
-                                    const parent = target.parentElement;
-                                    if (parent) {
-                                      parent.innerHTML = `<div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold">${player.name.charAt(0)}</div>`;
-                                    }
-                                  }}
-                                />
-                              ) : player.headshot_url ? (
+                              {(player.position === 'DST' || player.position === 'D/ST') ? (() => {
+                                const teamAbbr = getDSTTeamAbbr(player);
+                                return teamAbbr ? (
+                                  <img 
+                                    src={getTeamLogoWithFallback(teamAbbr)} 
+                                    alt={player.name} 
+                                    className="w-8 h-8 rounded-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                      const parent = target.parentElement;
+                                      if (parent) {
+                                        parent.innerHTML = `<div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold">${player.name.charAt(0)}</div>`;
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold">
+                                    {player.name.charAt(0)}
+                                  </div>
+                                );
+                              })() : player.headshot_url ? (
                                 <img src={player.headshot_url} alt={player.name} className="w-8 h-8 rounded-full" />
                               ) : (
                                 <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold">

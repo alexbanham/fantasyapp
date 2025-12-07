@@ -1558,6 +1558,40 @@ class ESPNService {
           console.log(`[fetchGameBoxscore] Sample player - ${p.fullName}, proTeamAbbreviation: ${proTeamAbbr}`);
         }
         
+        // Extract detailed stats if available
+        // ESPN boxscore entries may have stats in various formats
+        const stats = p.stats || p.playerPoolEntry?.player?.stats || {};
+        const actualStats = stats[0]?.stats || stats[0] || {}; // First stat period is usually the actual game stats
+        const projectedStats = stats[1]?.stats || stats[1] || {}; // Second might be projected
+        
+        // Extract common stat fields
+        const extractStats = (statObj) => {
+          if (!statObj || typeof statObj !== 'object') return {};
+          
+          return {
+            passingYards: statObj.passingYards || statObj['0'] || 0,
+            passingTouchdowns: statObj.passingTouchdowns || statObj['4'] || 0,
+            passingInterceptions: statObj.passingInterceptions || statObj['20'] || 0,
+            rushingYards: statObj.rushingYards || statObj['23'] || 0,
+            rushingTouchdowns: statObj.rushingTouchdowns || statObj['24'] || 0,
+            receivingYards: statObj.receivingYards || statObj['42'] || 0,
+            receivingReceptions: statObj.receivingReceptions || statObj['53'] || 0,
+            receivingTouchdowns: statObj.receivingTouchdowns || statObj['43'] || 0,
+            lostFumbles: statObj.lostFumbles || statObj['72'] || 0,
+            // Kicker stats
+            fieldGoalsMade: statObj.fieldGoalsMade || statObj['80'] || 0,
+            fieldGoalsAttempted: statObj.fieldGoalsAttempted || statObj['81'] || 0,
+            extraPointsMade: statObj.extraPointsMade || statObj['86'] || 0,
+            // D/ST stats
+            sacks: statObj.sacks || statObj['99'] || 0,
+            interceptions: statObj.interceptions || statObj['103'] || 0,
+            fumbleRecoveries: statObj.fumbleRecoveries || statObj['104'] || 0,
+            defensiveTouchdowns: statObj.defensiveTouchdowns || statObj['106'] || 0,
+            pointsAllowed: statObj.pointsAllowed || statObj['89'] || 0,
+            yardsAllowed: statObj.yardsAllowed || statObj['95'] || 0
+          };
+        };
+        
         return {
           espnId: p.id,
           name: p.fullName,
@@ -1565,7 +1599,9 @@ class ESPNService {
           proTeamId: proTeamAbbr, // This is already the abbreviation!
           jerseyNumber: p.jersey,
           fantasyPoints: p.totalPoints ?? 0,
-          projectedPoints: p.projectedTotalPoints ?? 0
+          projectedPoints: p.projectedTotalPoints ?? 0,
+          stats: extractStats(actualStats),
+          projectedStats: extractStats(projectedStats)
         };
       }
 
