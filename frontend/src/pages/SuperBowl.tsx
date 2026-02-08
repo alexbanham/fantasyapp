@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ChevronDown, ChevronUp, Lock, Pencil } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -32,12 +31,14 @@ const PLAYER_PALETTE = [
   '#06b6d4', '#0ea5e9', '#6366f1', '#8b5cf6', '#ec4899',
 ]
 
-// Super Bowl default: blues, grays, reds, greens – NFL team color vibe
-// 10 maximally distinct hues – no two in same family (one red, one orange, etc.)
+// Super Bowl palette – ordered for max contrast with few players
+// 2 players: red vs teal (opposite hues). 3: red, teal, gold. 4: + purple, etc.
 const SUPERBOWL_TEAM_PALETTE = [
-  '#1B4F72', '#00838F', '#2E7D32', '#F9A825', '#E65100',
-  '#C62828', '#AD1457', '#4527A0', '#37474F', '#4B92DB',
+  '#C62828', '#00838F', '#F9A825', '#4527A0', '#2E7D32',
+  '#E65100', '#4B92DB', '#AD1457', '#1B4F72', '#37474F',
 ]
+
+const ADMIN_PASSWORD = 'gobirds'
 
 function generateBoard(names: string[]): string[] {
   const board: string[] = Array(100).fill('')
@@ -125,6 +126,7 @@ function textColorForBg(bgHex: string): string {
 const SuperBowl: React.FC = () => {
   const [names, setNames] = useState<string[]>([])
   const [squareCost, setSquareCost] = useState(1)
+  const [costInput, setCostInput] = useState('1') // separate for mobile typing; syncs from API
   const [kickoffISO, setKickoffISO] = useState('')
   const [board, setBoard] = useState<string[]>(Array(100).fill(''))
   const [newName, setNewName] = useState('')
@@ -144,6 +146,8 @@ const SuperBowl: React.FC = () => {
   } | null>(null)
   const [liveError, setLiveError] = useState<string | null>(null)
   const hasLoadedSquares = useRef(false)
+  const liveGameRef = useRef(liveGame)
+  liveGameRef.current = liveGame
 
   const [scores, setScores] = useState<ScoreState>({
     Q1: { teamA: '', teamB: '' },
@@ -152,6 +156,7 @@ const SuperBowl: React.FC = () => {
     Q4: { teamA: '', teamB: '' },
     FINAL: { teamA: '', teamB: '' },
   })
+  const [readOnly, setReadOnly] = useState(false)
 
   // Detect dark mode
   useEffect(() => {
@@ -164,16 +169,20 @@ const SuperBowl: React.FC = () => {
 
   // Load shared squares from API and poll for updates (all visitors see same data)
   useEffect(() => {
-    const apply = (d: { names?: string[]; squareCost?: number; kickoffISO?: string; board?: string[]; teamAName?: string; teamBName?: string; teamALogo?: string; teamBLogo?: string; scores?: Record<string, { teamA?: string; teamB?: string; sea?: string; ne?: string }> }) => {
+        const apply = (d: { names?: string[]; squareCost?: number; kickoffISO?: string; board?: string[]; teamAName?: string; teamBName?: string; teamALogo?: string; teamBLogo?: string; readOnly?: boolean; scores?: Record<string, { teamA?: string; teamB?: string; sea?: string; ne?: string }> }, skipScores = false) => {
       if (Array.isArray(d.names)) setNames(d.names)
-      if (d.squareCost != null) setSquareCost(d.squareCost)
+      if (d.squareCost != null) {
+        setSquareCost(d.squareCost)
+        setCostInput(String(d.squareCost))
+      }
       if (d.kickoffISO != null) setKickoffISO(d.kickoffISO)
       if (Array.isArray(d.board) && d.board.length === 100) setBoard(d.board)
       if (d.teamAName != null) setTeamAName(d.teamAName)
       if (d.teamBName != null) setTeamBName(d.teamBName)
       if (d.teamALogo != null) setTeamALogo(d.teamALogo)
       if (d.teamBLogo != null) setTeamBLogo(d.teamBLogo)
-      if (d.scores && typeof d.scores === 'object') {
+      if (d.readOnly !== undefined) setReadOnly(d.readOnly)
+      if (!skipScores && d.scores && typeof d.scores === 'object') {
         setScores(
           Object.fromEntries(
             Object.entries(d.scores).map(([k, v]) => {
@@ -192,7 +201,8 @@ const SuperBowl: React.FC = () => {
       try {
         const res = await getSuperBowlSquares()
         if (res.success && res.squares) {
-          apply(res.squares)
+          // Skip scores when liveGame has realtime data (ESPN is authoritative)
+          apply(res.squares, !!liveGameRef.current)
           hasLoadedSquares.current = true
         }
       } catch {
@@ -276,12 +286,10 @@ const SuperBowl: React.FC = () => {
     return () => clearInterval(interval)
   }, [])
 
-  const locked = kickoffISO && Date.now() >= new Date(kickoffISO).getTime()
-
   const regenerate = (list = names) => setBoard(generateBoard(list))
 
   const addName = () => {
-    if (!newName.trim() || locked) return
+    if (!newName.trim() || readOnly) return
     const updated = [...names, newName.trim()]
     setNames(updated)
     regenerate(updated)
@@ -289,7 +297,7 @@ const SuperBowl: React.FC = () => {
   }
 
   const removeName = (name: string) => {
-    if (locked) return
+    if (readOnly) return
     const updated = names.filter(n => n !== name)
     setNames(updated)
     regenerate(updated)
@@ -348,61 +356,141 @@ const SuperBowl: React.FC = () => {
     return out
   }, [scores, board])
 
-  const updateScore = (period: PeriodKey, team: 'teamA' | 'teamB', val: string) => {
-    if (val !== '' && !/^\d+$/.test(val)) return
-    setScores(prev => ({
-      ...prev,
-      [period]: { ...prev[period], [team]: val },
-    }))
+  const scoresFromRealtime = !!liveGame
+
+  // Square that would win if the quarter ended right now (live only)
+  const liveCurrentWinnerIdx = liveGame?.isLive
+    ? (Math.abs(liveGame.teamB.score) % 10) * 10 + (Math.abs(liveGame.teamA.score) % 10)
+    : null
+
+  const [setupOpen, setSetupOpen] = useState(false)
+
+  // Toggle read-only: password-protected, persists in DB
+  const [showTogglePrompt, setShowTogglePrompt] = useState(false)
+  const [togglePassword, setTogglePassword] = useState('')
+  const [toggleError, setToggleError] = useState('')
+
+  const handleToggleReadOnly = async () => {
+    if (togglePassword.trim().toLowerCase() !== ADMIN_PASSWORD.toLowerCase()) {
+      setToggleError('Wrong password')
+      return
+    }
+    const next = !readOnly
+    setReadOnly(next)
+    setShowTogglePrompt(false)
+    setTogglePassword('')
+    setToggleError('')
+    try {
+      await putSuperBowlSquares({ readOnly: next })
+    } catch {
+      setReadOnly(!next) // revert on failure
+    }
   }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <style>{`
         @media (max-width: 640px) {
-          .sb-board { --cell: 26px; --axis-w: 44px; --axis-h: 28px; }
+          .sb-board { --cell: 32px; --axis-w: 40px; --axis-h: 28px; }
         }
         @media (min-width: 641px) {
           .sb-board { --cell: 46px; --axis-w: 64px; --axis-h: 34px; }
         }
       `}</style>
-      <div className="container mx-auto max-w-[1100px] px-3 sm:px-4 py-4 sm:py-6">
-        {/* Header - stacks on mobile */}
-        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex flex-col gap-1 order-2 sm:order-1">
-            {(liveGame?.dateDisplay || kickoffISO) && (
-              <div className="text-sm sm:text-base font-semibold text-muted-foreground truncate max-w-[calc(100vw-2rem)]">
-                {liveGame?.dateDisplay ?? (kickoffISO ? new Date(kickoffISO).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' }) : '')}
+      <div className="container mx-auto max-w-[1100px] px-3 sm:px-4 py-4 sm:py-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {/* Sticky live score bar - mobile only */}
+        {(liveGame || teamAName || teamBName) && (
+          <div className="sm:hidden sticky top-0 z-10 -mx-3 px-3 pt-2 pb-3 mb-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border pt-[env(safe-area-inset-top)]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <img src={teamALogo} alt="" className="h-6 w-6 shrink-0" />
+                <span className="font-semibold text-sm truncate">{teamAName}</span>
               </div>
-            )}
-            <Link to="/">
-              <Button variant="ghost" size="sm" className="w-fit">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Fantasy
-              </Button>
-            </Link>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-lg font-bold tabular-nums">{(liveGame?.teamA.score ?? scores.FINAL.teamA) || '0'}</span>
+                <span className="text-muted-foreground">–</span>
+                <span className="text-lg font-bold tabular-nums">{(liveGame?.teamB.score ?? scores.FINAL.teamB) || '0'}</span>
+                {liveGame?.isLive && (
+                  <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-600 dark:text-green-400 text-xs font-semibold">
+                    Q{liveGame.period} {liveGame.clock || ''}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
+                <span className="font-semibold text-sm truncate">{teamBName}</span>
+                <img src={teamBLogo} alt="" className="h-6 w-6 shrink-0" />
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 order-1 sm:order-2 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-bold">Super Bowl Squares</h1>
-            <ColorSchemeToggler />
-            {liveGame?.isLive && (
+        )}
+
+        {/* Header - single line */}
+        <div className="mb-4 sm:mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
+          {(liveGame?.dateDisplay || kickoffISO) && (
+            <span className="text-sm sm:text-base font-semibold text-muted-foreground truncate">
+              {liveGame?.dateDisplay ?? (kickoffISO ? new Date(kickoffISO).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' }) : '')}
+            </span>
+          )}
+          <h1 className="text-xl sm:text-2xl font-bold">Super Bowl Squares</h1>
+          <ColorSchemeToggler />
+          {showTogglePrompt ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={togglePassword}
+                  onChange={e => { setTogglePassword(e.target.value); setToggleError('') }}
+                  onKeyDown={e => e.key === 'Enter' && handleToggleReadOnly()}
+                  className="h-9 w-[120px] sm:w-[140px]"
+                  autoFocus
+                />
+                <Button size="sm" onClick={handleToggleReadOnly} className="shrink-0">
+                  {readOnly ? 'Unlock' : 'Lock'}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => { setShowTogglePrompt(false); setTogglePassword(''); setToggleError('') }}>
+                  Cancel
+                </Button>
+                {toggleError && <span className="text-destructive text-xs w-full">{toggleError}</span>}
+              </div>
+          ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTogglePrompt(true)}
+                className="shrink-0 gap-1.5"
+                title={readOnly ? 'Unlock to edit' : 'Lock (read-only)'}
+              >
+                {readOnly ? <Pencil className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                {readOnly ? 'Unlock' : 'Lock'}
+              </Button>
+          )}
+          {liveGame?.isLive && (
               <span className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full bg-green-500/20 text-green-600 dark:text-green-400 text-xs sm:text-sm font-semibold">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 Live
               </span>
-            )}
-            {liveError && (
-              <span className="text-xs sm:text-sm text-destructive">{liveError}</span>
-            )}
-          </div>
+          )}
+          {liveError && (
+            <span className="text-xs sm:text-sm text-destructive">{liveError}</span>
+          )}
         </div>
 
-        {/* Setup Card */}
-        <Card className="mb-4 sm:mb-6">
-          <CardHeader>
-            <CardTitle>Setup</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        {/* Content - Board first, Setup last */}
+        <div className="flex flex-col">
+          {/* Setup Card - last, collapsible on mobile */}
+          <Card className="mb-4 sm:mb-6 order-4">
+            <CardHeader
+              className="sm:cursor-default cursor-pointer select-none touch-manipulation min-h-[44px] sm:min-h-0"
+              onClick={() => window.matchMedia('(max-width: 639px)').matches && setSetupOpen(o => !o)}
+            >
+              <div className="flex items-center justify-between">
+                <CardTitle>Setup</CardTitle>
+                <span className="sm:hidden text-muted-foreground">
+                  {setupOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </span>
+              </div>
+            </CardHeader>
+          <CardContent className={`space-y-4 ${!setupOpen ? 'hidden sm:block' : ''}`}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground block mb-2">
@@ -412,7 +500,7 @@ const SuperBowl: React.FC = () => {
                   type="datetime-local"
                   value={kickoffISO ? toDatetimeLocal(kickoffISO) : ''}
                   onChange={e => setKickoffISO(e.target.value ? new Date(e.target.value).toISOString() : '')}
-                  disabled={!!locked || !!liveGame?.kickoffISO}
+                  disabled={readOnly || !!liveGame?.kickoffISO}
                 />
               </div>
               <div>
@@ -420,11 +508,19 @@ const SuperBowl: React.FC = () => {
                   Cost per Square ($)
                 </label>
                 <Input
-                  type="number"
-                  min={0.25}
-                  step={0.25}
-                  value={squareCost}
-                  onChange={e => setSquareCost(parseFloat(e.target.value) || 1)}
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="1"
+                  value={costInput}
+                  onChange={e => setCostInput(e.target.value.replace(/[^0-9.]/g, ''))}
+                  onBlur={() => {
+                    const n = parseFloat(costInput)
+                    const v = (!Number.isNaN(n) && n >= 0.25) ? n : 1
+                    setSquareCost(v)
+                    setCostInput(String(v))
+                  }}
+                  className="min-w-0"
+                  disabled={readOnly}
                 />
               </div>
               <div>
@@ -435,7 +531,7 @@ const SuperBowl: React.FC = () => {
                   value={teamAName}
                   onChange={e => setTeamAName(e.target.value)}
                   placeholder="e.g. AFC Champion"
-                  disabled={!!locked}
+                  disabled={readOnly}
                 />
               </div>
               <div>
@@ -446,7 +542,7 @@ const SuperBowl: React.FC = () => {
                   value={teamBName}
                   onChange={e => setTeamBName(e.target.value)}
                   placeholder="e.g. NFC Champion"
-                  disabled={!!locked}
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -471,8 +567,8 @@ const SuperBowl: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Scores & Winners Card */}
-        <Card className="mb-4 sm:mb-6">
+        {/* Scores & Winners Card - 2nd */}
+        <Card className="mb-4 sm:mb-6 order-2">
           <CardHeader>
             <CardTitle>Scores & Winners</CardTitle>
           </CardHeader>
@@ -493,26 +589,16 @@ const SuperBowl: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
                         <img src={teamALogo} alt="" className="h-5 w-5 shrink-0" />
-                        <Input
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          placeholder="0"
-                          value={scores[p.key].teamA}
-                          onChange={e => updateScore(p.key, 'teamA', e.target.value)}
-                          className="h-9 flex-1 min-w-0"
-                        />
+                        <span className="flex-1 min-w-0 py-2 font-semibold tabular-nums">
+                          {scoresFromRealtime ? scores[p.key].teamA || '0' : '—'}
+                        </span>
                       </div>
                       <span className="text-muted-foreground">–</span>
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
                         <img src={teamBLogo} alt="" className="h-5 w-5 shrink-0" />
-                        <Input
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          placeholder="0"
-                          value={scores[p.key].teamB}
-                          onChange={e => updateScore(p.key, 'teamB', e.target.value)}
-                          className="h-9 flex-1 min-w-0"
-                        />
+                        <span className="flex-1 min-w-0 py-2 font-semibold tabular-nums">
+                          {scoresFromRealtime ? scores[p.key].teamB || '0' : '—'}
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 min-w-0">
@@ -558,25 +644,11 @@ const SuperBowl: React.FC = () => {
                     return (
                       <React.Fragment key={p.key}>
                         <div className="py-2 border-t border-border">{p.label}</div>
-                        <div className="py-2 border-t border-border">
-                          <Input
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            placeholder="e.g. 14"
-                            value={scores[p.key].teamA}
-                            onChange={e => updateScore(p.key, 'teamA', e.target.value)}
-                            className="h-10"
-                          />
+                        <div className="py-2 border-t border-border font-semibold tabular-nums">
+                          {scoresFromRealtime ? scores[p.key].teamA || '0' : '—'}
                         </div>
-                        <div className="py-2 border-t border-border">
-                          <Input
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            placeholder="e.g. 17"
-                            value={scores[p.key].teamB}
-                            onChange={e => updateScore(p.key, 'teamB', e.target.value)}
-                            className="h-10"
-                          />
+                        <div className="py-2 border-t border-border font-semibold tabular-nums">
+                          {scoresFromRealtime ? scores[p.key].teamB || '0' : '—'}
                         </div>
                         <div className="py-2 border-t border-border flex items-center gap-2">
                           <span className="font-extrabold">{winnerLabel}</span>
@@ -595,13 +667,15 @@ const SuperBowl: React.FC = () => {
               </div>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
-              Enter end-of-period scores; winners are chosen by last digit.
+              {scoresFromRealtime
+                ? 'Scores from ESPN. Winners are chosen by last digit of each team\'s score at end of period.'
+                : 'Scores will appear when the game starts (from ESPN).'}
             </p>
           </CardContent>
         </Card>
 
-        {/* Players Card */}
-        <Card className="mb-4 sm:mb-6">
+        {/* Players Card - 3rd */}
+        <Card className="mb-4 sm:mb-6 order-3">
           <CardHeader>
             <CardTitle>Players</CardTitle>
           </CardHeader>
@@ -613,17 +687,17 @@ const SuperBowl: React.FC = () => {
               <span className="text-muted-foreground">({filled} filled • {blanks} open)</span>
             </div>
 
-            {!locked && (
+            {!readOnly && (
               <div className="flex gap-2 flex-wrap">
                 <Input
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addName()}
                   placeholder="Add name"
-                  className="flex-1 min-w-[120px] sm:min-w-[150px]"
+                  className="flex-1 min-w-[120px] sm:min-w-[150px] min-h-[44px] sm:min-h-9"
                 />
-                <Button onClick={addName}>Add</Button>
-                <Button variant="secondary" onClick={() => regenerate()}>
+                <Button onClick={addName} className="min-h-[44px] sm:min-h-9 touch-manipulation">Add</Button>
+                <Button variant="secondary" onClick={() => regenerate()} className="min-h-[44px] sm:min-h-9 touch-manipulation">
                   Shuffle
                 </Button>
               </div>
@@ -635,11 +709,11 @@ const SuperBowl: React.FC = () => {
                 return (
                 <span
                   key={n}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-extrabold border border-black/10"
+                  className="inline-flex items-center gap-2 px-3 py-2 sm:py-1.5 rounded-full text-sm font-extrabold border border-black/10 touch-manipulation min-h-[44px] sm:min-h-0 items-center"
                   style={{ background: bg, color: textColorForBg(bg) }}
                 >
                   {n}
-                  {!locked && (
+                  {!readOnly && (
                     <span
                       onClick={() => removeName(n)}
                       className="cursor-pointer opacity-85 pl-0.5"
@@ -649,17 +723,18 @@ const SuperBowl: React.FC = () => {
                     </span>
                   )}
                 </span>
-              )})}
+              )
+            })}
             </div>
 
-            {locked && (
-              <p className="text-muted-foreground text-sm">Board locked at kickoff</p>
+            {readOnly && (
+              <p className="text-muted-foreground text-sm">Board is read-only. Use the toggle above to unlock.</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Board Card */}
-        <Card>
+        {/* Board Card - first */}
+        <Card className="order-1 mb-4 sm:mb-6">
           <CardHeader>
             <CardTitle>Board</CardTitle>
           </CardHeader>
@@ -692,7 +767,7 @@ const SuperBowl: React.FC = () => {
                 </div>
               </div>
             )}
-            <div className="overflow-x-auto overflow-y-hidden pt-4 -mx-3 sm:mx-0 px-3 sm:px-0 touch-pan-x">
+            <div className="overflow-x-auto overflow-y-hidden pt-4 -mx-3 sm:mx-0 px-3 sm:px-0 touch-pan-x overscroll-x-contain -webkit-overflow-scrolling-touch">
               <div
                 className="sb-board grid gap-1 sm:gap-2 min-w-[280px] sm:min-w-[520px] max-w-full"
                 style={{
@@ -763,21 +838,24 @@ const SuperBowl: React.FC = () => {
                   {board.map((name, idx) => {
                     const bg = name ? colorForName(name, nameToColorIndex, isDark, playerPalette) : 'hsl(var(--muted))'
                     const textColor = name ? textColorForBg(bg) : 'hsl(var(--muted-foreground))'
+                    const isLiveWinner = liveCurrentWinnerIdx === idx
                     return (
                     <div
                       key={idx}
-                      className="rounded-xl flex items-center justify-center text-center px-1 sm:px-1.5 border border-black/10 text-[10px] sm:text-xs font-extrabold leading-tight overflow-hidden"
+                      className={`rounded-xl flex items-center justify-center text-center px-1 sm:px-1.5 border text-[10px] sm:text-xs font-extrabold leading-tight overflow-hidden ${isLiveWinner ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-background shadow-lg shadow-green-500/40' : 'border-black/10'}`}
                       style={{ background: bg, color: textColor }}
-                      title={name || 'Open'}
+                      title={name ? (isLiveWinner ? `${name} – winning now` : name) : 'Open'}
                     >
                       {name || '—'}
                     </div>
-                  )})}
+                  )
+                })}
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   )

@@ -41,6 +41,7 @@ validateEnvironment();
 console.log('Environment validation passed');
 const playerDetailsRoutes = require('./routes/playerDetails');
 const liveRoutes = require('./routes/live');
+const superBowlSquaresRoutes = require('./routes/superBowlSquares');
 const configRoutes = require('./routes/config');
 const newsRoutes = require('./routes/news');
 const dataRoutes = require('./routes/data');
@@ -105,83 +106,8 @@ mongoose.connect(mongoUri, {
 });
 // Routes
 app.use('/api/players', playerDetailsRoutes);
-// Super Bowl squares - /api/sb-squares (no leading slash in axios = baseURL + path)
-const SuperBowlSquares = require('./models/SuperBowlSquares');
-app.get('/api/sb-squares', async (req, res) => {
-  try {
-    const doc = await SuperBowlSquares.getSquares();
-    res.json({
-      success: true,
-      squares: {
-        names: doc.names || [],
-        squareCost: doc.squareCost ?? 1,
-        kickoffISO: doc.kickoffISO || '',
-        board: doc.board && doc.board.length === 100 ? doc.board : Array(100).fill(''),
-        teamAName: doc.teamAName || 'AFC',
-        teamBName: doc.teamBName || 'NFC',
-        teamALogo: doc.teamALogo || '',
-        teamBLogo: doc.teamBLogo || '',
-        scores: doc.scores || {
-          Q1: { teamA: '', teamB: '' },
-          Q2: { teamA: '', teamB: '' },
-          Q3: { teamA: '', teamB: '' },
-          Q4: { teamA: '', teamB: '' },
-          FINAL: { teamA: '', teamB: '' }
-        }
-      }
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[SuperBowlSquares] GET error:', error);
-    }
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch squares',
-      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
-    });
-  }
-});
-const sbSquaresPutHandler = async (req, res) => {
-  try {
-    const { names, squareCost, kickoffISO, board, teamAName, teamBName, teamALogo, teamBLogo, scores } = req.body || {};
-    const doc = await SuperBowlSquares.updateSquares({
-      ...(names !== undefined && { names: Array.isArray(names) ? names : [] }),
-      ...(squareCost !== undefined && { squareCost: Math.max(0, Number(squareCost) || 1) }),
-      ...(kickoffISO !== undefined && { kickoffISO: String(kickoffISO) }),
-      ...(board !== undefined && { board: Array.isArray(board) && board.length === 100 ? board : undefined }),
-      ...(teamAName !== undefined && { teamAName: String(teamAName) }),
-      ...(teamBName !== undefined && { teamBName: String(teamBName) }),
-      ...(teamALogo !== undefined && { teamALogo: String(teamALogo) }),
-      ...(teamBLogo !== undefined && { teamBLogo: String(teamBLogo) }),
-      ...(scores !== undefined && typeof scores === 'object' && { scores })
-    });
-    res.json({
-      success: true,
-      squares: {
-        names: doc.names || [],
-        squareCost: doc.squareCost ?? 1,
-        kickoffISO: doc.kickoffISO || '',
-        board: doc.board || Array(100).fill(''),
-        teamAName: doc.teamAName || 'AFC',
-        teamBName: doc.teamBName || 'NFC',
-        teamALogo: doc.teamALogo || '',
-        teamBLogo: doc.teamBLogo || '',
-        scores: doc.scores || {}
-      }
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[SuperBowlSquares] PUT error:', error);
-    }
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update squares',
-      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
-    });
-  }
-};
-app.put('/api/sb-squares', sbSquaresPutHandler);
 app.use('/api/live', liveRoutes);
+app.use('/api/sb-squares', superBowlSquaresRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/data', dataRoutes);

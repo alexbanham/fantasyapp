@@ -322,6 +322,7 @@ export const putSuperBowlSquares = async (data: {
   teamBName?: string
   teamALogo?: string
   teamBLogo?: string
+  readOnly?: boolean
   scores?: Record<string, { teamA: string; teamB: string }>
 }) => {
   const response = await api.put('sb-squares', data)

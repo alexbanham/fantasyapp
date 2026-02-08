@@ -49,9 +49,9 @@ services:
         sync: false
         required: true
         
-      # Game Polling - Required (60s when live, 5min when idle - keeps cheap deployments within limits)
+      # Game Polling - Required
       - key: GAME_POLL_ACTIVE_INTERVAL
-        value: 60000
+        value: 15000
         required: true
       - key: GAME_POLL_IDLE_INTERVAL
         value: 300000

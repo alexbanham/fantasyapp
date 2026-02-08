@@ -15,6 +15,7 @@ const superBowlSquaresSchema = new mongoose.Schema({
   teamBName: { type: String, default: 'NFC' },
   teamALogo: { type: String, default: '' },
   teamBLogo: { type: String, default: '' },
+  readOnly: { type: Boolean, default: false },
   scores: {
     Q1: scoreStateSchema,
     Q2: scoreStateSchema,
@@ -58,7 +59,7 @@ superBowlSquaresSchema.statics.updateSquares = async function (updates) {
   if (!doc) {
     doc = new this(updates);
   } else {
-    const allowed = ['names', 'squareCost', 'kickoffISO', 'board', 'teamAName', 'teamBName', 'teamALogo', 'teamBLogo', 'scores'];
+    const allowed = ['names', 'squareCost', 'kickoffISO', 'board', 'teamAName', 'teamBName', 'teamALogo', 'teamBLogo', 'readOnly', 'scores'];
     for (const key of allowed) {
       if (updates[key] !== undefined) {
         doc[key] = updates[key];
