@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import { ColorSchemeProvider, useColorScheme } from './contexts/ColorSchemeContext'
 import { FontProvider } from './contexts/FontContext'
 import { getBackgroundClass } from './lib/colorSchemes'
@@ -22,10 +22,13 @@ import Data from './pages/Data'
 import News from './pages/News'
 import Money from './pages/Money'
 import Orangemen from './pages/Orangemen'
+import SuperBowl from './pages/SuperBowl'
 import Snowflakes from './components/Snowflakes'
 
 function AppContent() {
   const { colorScheme } = useColorScheme()
+  const location = useLocation()
+  const isSuperBowlPage = location.pathname === '/superbowl'
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [passwordPromptOpen, setPasswordPromptOpen] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -75,11 +78,11 @@ function AppContent() {
   }
   
   return (
-    <Router>
-      <div className={`min-h-screen text-foreground ${getBackgroundClass(colorScheme)}`}>
-        <Snowflakes />
-        <Routes>
+    <div className={`min-h-screen text-foreground ${getBackgroundClass(colorScheme)}`}>
+      {!isSuperBowlPage && <Snowflakes />}
+      <Routes>
           <Route path="/orangemen" element={<Orangemen />} />
+          <Route path="/superbowl" element={<SuperBowl />} />
           <Route path="/" element={<Layout onConfigClick={handleConfigClick}><Dashboard /></Layout>} />
           <Route path="/league" element={<Layout onConfigClick={handleConfigClick}><League /></Layout>} />
           <Route path="/analytics" element={<Layout onConfigClick={handleConfigClick}><Analytics /></Layout>} />
@@ -121,8 +124,7 @@ function AppContent() {
           currentWeek={config?.currentWeek || 1}
           currentSeason={config?.currentSeason || new Date().getFullYear()}
         />
-      </div>
-    </Router>
+    </div>
   )
 }
 
@@ -135,7 +137,9 @@ function App() {
   return (
     <ColorSchemeProvider>
       <FontProvider>
-        <AppContent />
+        <Router>
+          <AppContent />
+        </Router>
       </FontProvider>
     </ColorSchemeProvider>
   )

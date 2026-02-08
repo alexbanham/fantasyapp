@@ -5,6 +5,40 @@ const Config = require('../models/Config');
 const espnService = require('../services/espnService');
 const gamePollingService = require('../services/gamePollingService');
 
+// GET /api/live/superbowl - Super Bowl game with teams, scores, and per-quarter linescores
+// Uses currentSeason from Config DB for correct ESPN data
+router.get('/superbowl', async (req, res) => {
+  try {
+    const config = await Config.getConfig();
+    const season = config.currentSeason;
+
+    const result = await espnService.fetchSuperBowlScoreboard(season);
+
+    if (!result.success) {
+      console.log('[SuperBowl] Fetch failed:', { season, error: result.error });
+      return res.status(404).json({
+        success: false,
+        error: result.error || 'Super Bowl game not found',
+        game: null
+      });
+    }
+
+    res.json({
+      success: true,
+      game: result.game
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error fetching Super Bowl:', error);
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch Super Bowl',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
+    });
+  }
+});
+
 // GET /api/live/games - List of simplified game summaries
 router.get('/', async (req, res) => {
   try {

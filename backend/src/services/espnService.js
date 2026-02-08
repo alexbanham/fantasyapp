@@ -1488,6 +1488,169 @@ class ESPNService {
     }
   }
 
+  /**
+   * AFC team abbreviations (for Super Bowl squares - AFC = horizontal axis)
+   */
+  static get AFCTeams() {
+    return new Set(['BUF', 'MIA', 'NE', 'NYJ', 'BAL', 'CIN', 'CLE', 'PIT', 'HOU', 'IND', 'JAX', 'TEN', 'DEN', 'KC', 'LV', 'LAC']);
+  }
+
+  /**
+   * NFC team abbreviations (for Super Bowl squares - NFC = vertical axis)
+   */
+  static get NFCTeams() {
+    return new Set(['DAL', 'NYG', 'PHI', 'WAS', 'CHI', 'DET', 'GB', 'MIN', 'ATL', 'CAR', 'NO', 'TB', 'ARI', 'LAR', 'SF', 'SEA']);
+  }
+
+  /**
+   * Fetch Super Bowl game from ESPN API.
+   * Uses dates parameter (same pattern as fetchScoreboard) - Super Bowl is in Feb of season+1.
+   * Season must come from Config DB (currentSeason).
+   * @param {number} season - Season year from Config (e.g. 2025 for 2025 season Super Bowl)
+   */
+  async fetchSuperBowlScoreboard(season) {
+    try {
+      // Season can be undefined if Config not loaded; derive sensible default
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const effectiveSeason = season ?? (month < 2 ? year - 1 : year);
+
+      // Super Bowl is first Sunday in Feb of next calendar year (season 2025 → Feb 2026)
+      const febYear = effectiveSeason + 1;
+      const start = `${febYear}0201`;
+      const end = `${febYear}0214`;
+      const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${start}-${end}`;
+
+      const response = await axios.get(url, {
+        headers: { 'User-Agent': 'fantasyapp/1.0' }
+      });
+
+      const events = response.data?.events || [];
+      if (events.length === 0) {
+        return { success: false, error: 'No games found for Super Bowl date range', game: null };
+      }
+
+      // Helper: notes can be at event level or inside competitions[0] (ESPN varies)
+      const getNotes = (e) => e.notes || e.competitions?.[0]?.notes || [];
+      const getHeadline = (e) => {
+        const notes = getNotes(e);
+        const ev = notes.find((n) => n.type === 'event');
+        return (ev?.headline || notes[0]?.headline || '').toLowerCase();
+      };
+
+      // Filter to Super Bowl (exclude Pro Bowl which also appears in Feb)
+      let superBowlEvent = events.find((e) => getHeadline(e).includes('super bowl'));
+      if (!superBowlEvent) {
+        superBowlEvent = events.find((e) => e.week?.number === 5 && e.season?.type === 3);
+      }
+      if (!superBowlEvent) {
+        superBowlEvent = events.find((e) => (e.name || '').toLowerCase().includes(' vs ') && !getHeadline(e).includes('pro bowl'));
+      }
+      if (!superBowlEvent) {
+        return { success: false, error: 'No Super Bowl game found for this season', game: null };
+      }
+
+      const result = this._parseSuperBowlEvent(superBowlEvent, effectiveSeason);
+      if (!result) {
+        return { success: false, error: 'Failed to parse Super Bowl data', game: null };
+      }
+      return result;
+    } catch (error) {
+      console.error('Error fetching Super Bowl scoreboard:', error);
+      return { success: false, error: error.message, game: null };
+    }
+  }
+
+  _parseSuperBowlEvent(event, seasonYear) {
+    try {
+      const competition = event.competitions[0];
+      const competitors = competition.competitors;
+      const homeTeam = competitors.find(t => t.homeAway === 'home');
+      const awayTeam = competitors.find(t => t.homeAway === 'away');
+
+      const homeAbbr = homeTeam.team.abbreviation;
+      const awayAbbr = awayTeam.team.abbreviation;
+      const isHomeAFC = ESPNService.AFCTeams.has(homeAbbr);
+      const isAwayAFC = ESPNService.AFCTeams.has(awayAbbr);
+
+      let teamA, teamB, teamAConf, teamBConf;
+      if (isHomeAFC && !isAwayAFC) {
+        teamA = homeTeam;
+        teamB = awayTeam;
+        teamAConf = 'AFC';
+        teamBConf = 'NFC';
+      } else if (isAwayAFC && !isHomeAFC) {
+        teamA = awayTeam;
+        teamB = homeTeam;
+        teamAConf = 'AFC';
+        teamBConf = 'NFC';
+      } else {
+        teamA = homeTeam;
+        teamB = awayTeam;
+        teamAConf = 'AFC';
+        teamBConf = 'NFC';
+      }
+
+      const teamAScore = parseInt(teamA.score || '0', 10);
+      const teamBScore = parseInt(teamB.score || '0', 10);
+
+      const teamALinescores = (teamA.linescores || []).reduce((acc, ls) => {
+        acc[`${ls.period}`] = String(ls.displayValue || ls.value || '0');
+        return acc;
+      }, {});
+      const teamBLinescores = (teamB.linescores || []).reduce((acc, ls) => {
+        acc[`${ls.period}`] = String(ls.displayValue || ls.value || '0');
+        return acc;
+      }, {});
+
+      const isCompleted = competition.status?.type?.completed || false;
+      const period = competition.status?.period || 0;
+      const clock = competition.status?.displayClock || null;
+
+      // Kickoff from event.date or competition.startDate (ISO); display from status (detail/shortDetail in type)
+      const kickoffISO = event.date || competition.startDate || null;
+      const dateDisplay = competition.status?.type?.detail || competition.status?.type?.shortDetail || competition.status?.detail || competition.status?.shortDetail || null;
+
+      return {
+        success: true,
+        game: {
+          eventId: event.id,
+          season: event.season?.year || seasonYear,
+          isLive: !isCompleted && (period > 0 || competition.status?.type?.state === 'in'),
+          status: competition.status?.type?.name || 'STATUS_SCHEDULED',
+          period,
+          clock,
+          kickoffISO,
+          dateDisplay,
+          teamA: {
+            name: teamA.team.displayName,
+            abbreviation: teamA.team.abbreviation,
+            logo: teamA.team.logo,
+            color: teamA.team.color ? `#${teamA.team.color}` : null,
+            alternateColor: teamA.team.alternateColor ? `#${teamA.team.alternateColor}` : null,
+            score: teamAScore,
+            conference: teamAConf,
+            linescores: teamALinescores
+          },
+          teamB: {
+            name: teamB.team.displayName,
+            abbreviation: teamB.team.abbreviation,
+            logo: teamB.team.logo,
+            color: teamB.team.color ? `#${teamB.team.color}` : null,
+            alternateColor: teamB.team.alternateColor ? `#${teamB.team.alternateColor}` : null,
+            score: teamBScore,
+            conference: teamBConf,
+            linescores: teamBLinescores
+          },
+          headline: (event.notes || event.competitions?.[0]?.notes || [])[0]?.headline
+        }
+      };
+    } catch (err) {
+      return null;
+    }
+  }
+
   // Generate hash for game data to detect changes
   generateGameHash(gameData) {
     const crypto = require('crypto');

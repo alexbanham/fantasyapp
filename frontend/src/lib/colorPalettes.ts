@@ -441,6 +441,26 @@ export const colorPalettes: ColorPalette[] = [
       border: 'rgba(198, 12, 48, 0.1)'
     },
     tailwindBackground: 'bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900'
+  },
+  {
+    value: 'superbowl',
+    label: 'Super Bowl',
+    description: 'Light, clean football theme',
+    colors: ['#D4A017', '#2C5282', '#FAF8F5'],
+    cssVariables: {
+      primary: '45 95% 48%',
+      primaryForeground: '210 25% 12%',
+      accent: '210 50% 25%',
+      accentForeground: '0 0% 98%',
+      border: '40 10% 88%',
+      ring: '45 95% 48%'
+    },
+    backgroundGradient: 'linear-gradient(to bottom, #FAF8F5, #F5F0E8)',
+    glassEffect: {
+      background: 'rgba(212, 160, 23, 0.08)',
+      border: 'rgba(212, 160, 23, 0.15)'
+    },
+    tailwindBackground: 'bg-gradient-to-b from-amber-50 to-stone-100'
   }
 ]
 

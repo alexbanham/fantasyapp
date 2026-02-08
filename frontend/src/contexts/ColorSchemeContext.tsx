@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
-export type ColorScheme = 'purple' | 'blackscale' | 'eagles' | 'cowboys' | 'niners' | 'rams' | 'christmas' | 'chiefs' | 'packers' | 'steelers' | 'raiders' | 'dolphins' | 'bills' | 'ravens' | 'seahawks' | 'broncos' | 'saints' | 'bucs' | 'titans' | 'chargers' | 'patriots' | 'syracuse'
+export type ColorScheme = 'purple' | 'blackscale' | 'eagles' | 'cowboys' | 'niners' | 'rams' | 'christmas' | 'chiefs' | 'packers' | 'steelers' | 'raiders' | 'dolphins' | 'bills' | 'ravens' | 'seahawks' | 'broncos' | 'saints' | 'bucs' | 'titans' | 'chargers' | 'patriots' | 'syracuse' | 'superbowl'
 
 interface ColorSchemeContextType {
   colorScheme: ColorScheme
@@ -31,9 +31,16 @@ export const ColorSchemeProvider: React.FC<ColorSchemeProviderProps> = ({ childr
     document.documentElement.classList.remove(
       'purple-scheme', 'blackscale-scheme', 'eagles-scheme', 'cowboys-scheme', 'niners-scheme', 'rams-scheme', 'christmas-scheme',
       'chiefs-scheme', 'packers-scheme', 'steelers-scheme', 'raiders-scheme', 'dolphins-scheme', 'bills-scheme', 'ravens-scheme',
-      'seahawks-scheme', 'broncos-scheme', 'saints-scheme', 'bucs-scheme', 'titans-scheme', 'chargers-scheme', 'patriots-scheme', 'syracuse-scheme'
+      'seahawks-scheme', 'broncos-scheme', 'saints-scheme', 'bucs-scheme', 'titans-scheme', 'chargers-scheme', 'patriots-scheme', 'syracuse-scheme', 'superbowl-scheme'
     )
     document.documentElement.classList.add(`${colorScheme}-scheme`)
+
+    // Super Bowl theme: force light mode (remove dark class); other themes use app default (dark)
+    if (colorScheme === 'superbowl') {
+      document.documentElement.classList.remove('dark')
+    } else {
+      document.documentElement.classList.add('dark')
+    }
   }, [colorScheme])
 
   return (

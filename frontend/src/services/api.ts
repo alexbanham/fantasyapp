@@ -299,6 +299,35 @@ export const getLiveGamesOnly = async () => {
   return response.data
 }
 
+// Get Super Bowl game with teams, scores, and per-quarter linescores
+// Uses currentSeason from backend Config
+export const getSuperBowlGame = async () => {
+  const response = await api.get('/live/superbowl')
+  return response.data
+}
+
+// Get shared Super Bowl squares config (all visitors see same data)
+export const getSuperBowlSquares = async () => {
+  const response = await api.get('sb-squares')
+  return response.data
+}
+
+// Update shared Super Bowl squares config
+export const putSuperBowlSquares = async (data: {
+  names?: string[]
+  squareCost?: number
+  kickoffISO?: string
+  board?: string[]
+  teamAName?: string
+  teamBName?: string
+  teamALogo?: string
+  teamBLogo?: string
+  scores?: Record<string, { teamA: string; teamB: string }>
+}) => {
+  const response = await api.put('sb-squares', data)
+  return response.data
+}
+
 export const getGameDetails = async (eventId: string) => {
   const response = await api.get(`/live/${eventId}`)
   return response.data
