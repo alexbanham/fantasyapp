@@ -809,7 +809,7 @@ const SuperBowlBoard: React.FC = () => {
                 </div>
               </div>
             )}
-            <div className="overflow-x-auto overflow-y-hidden pt-4 -mx-3 sm:mx-0 px-3 sm:px-0 touch-pan-x overscroll-x-contain -webkit-overflow-scrolling-touch">
+            <div className="overflow-x-auto overflow-y-hidden pt-4 -mx-3 sm:mx-0 px-3 sm:px-0 touch-pan-x touch-pan-y overscroll-x-contain -webkit-overflow-scrolling-touch">
               <div
                 className="sb-board grid gap-1 sm:gap-2 min-w-[280px] sm:min-w-[520px] max-w-full"
                 style={{
