@@ -424,7 +424,7 @@ const SuperBowl: React.FC = () => {
                   min={0.25}
                   step={0.25}
                   value={squareCost}
-                  onChange={e => setSquareCost(+e.target.value)}
+                  onChange={e => setSquareCost(parseFloat(e.target.value) || 1)}
                 />
               </div>
               <div>

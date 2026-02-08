@@ -5,9 +5,10 @@ const scoreStateSchema = new mongoose.Schema({
   teamB: { type: String, default: '' }
 }, { _id: false });
 
+// All user-settable params persisted in MongoDB for all visitors
 const superBowlSquaresSchema = new mongoose.Schema({
   names: { type: [String], default: [] },
-  squareCost: { type: Number, default: 1 },
+  squareCost: { type: Number, default: 1, min: 0 }, // Cost per square ($)
   kickoffISO: { type: String, default: '' },
   board: { type: [String], default: () => Array(100).fill('') },
   teamAName: { type: String, default: 'AFC' },

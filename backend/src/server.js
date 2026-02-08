@@ -146,7 +146,7 @@ const sbSquaresPutHandler = async (req, res) => {
     const { names, squareCost, kickoffISO, board, teamAName, teamBName, teamALogo, teamBLogo, scores } = req.body || {};
     const doc = await SuperBowlSquares.updateSquares({
       ...(names !== undefined && { names: Array.isArray(names) ? names : [] }),
-      ...(squareCost !== undefined && { squareCost: Number(squareCost) || 1 }),
+      ...(squareCost !== undefined && { squareCost: Math.max(0, Number(squareCost) || 1) }),
       ...(kickoffISO !== undefined && { kickoffISO: String(kickoffISO) }),
       ...(board !== undefined && { board: Array.isArray(board) && board.length === 100 ? board : undefined }),
       ...(teamAName !== undefined && { teamAName: String(teamAName) }),
