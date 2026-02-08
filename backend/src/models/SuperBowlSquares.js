@@ -82,4 +82,11 @@ superBowlSquaresSchema.statics.updateBoard = async function (id, updates) {
   return doc;
 };
 
+// Delete board by ID
+superBowlSquaresSchema.statics.deleteBoard = async function (id) {
+  if (!mongoose.Types.ObjectId.isValid(id)) return null;
+  const doc = await this.findByIdAndDelete(id);
+  return doc;
+};
+
 module.exports = mongoose.model('SuperBowlSquares', superBowlSquaresSchema);

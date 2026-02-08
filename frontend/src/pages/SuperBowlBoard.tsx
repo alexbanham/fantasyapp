@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ChevronDown, ChevronUp, Lock, Pencil, ArrowLeft } from 'lucide-react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { ChevronDown, ChevronUp, Lock, Pencil, ArrowLeft, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import ColorSchemeToggler from '../components/ColorSchemeToggler'
-import { getSuperBowlGame, getSuperBowlSquares, putSuperBowlSquares } from '../services/api'
+import { getSuperBowlGame, getSuperBowlSquares, putSuperBowlSquares, deleteSuperBowlSquares } from '../services/api'
 
 // Default team logos - NFL conference logos (fallback when ESPN data not loaded)
 const DEFAULT_TEAM_A_LOGO =
@@ -16,12 +16,12 @@ const DEFAULT_TEAM_B_LOGO =
 type PeriodKey = 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'FINAL'
 type ScoreState = Record<PeriodKey, { teamA: string; teamB: string }>
 
+// Display 4 rows; Q4 and FINAL are the same in regulation, so we show one "End of 4th / Final" using FINAL (covers OT too)
 const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: 'Q1', label: 'End of 1st Quarter' },
   { key: 'Q2', label: 'Halftime (End of 2nd)' },
   { key: 'Q3', label: 'End of 3rd Quarter' },
-  { key: 'Q4', label: 'End of 4th Quarter' },
-  { key: 'FINAL', label: 'Final Score' },
+  { key: 'FINAL', label: 'End of 4th / Final' },
 ]
 
 const SUPERBOWL_TEAM_PALETTE = [
@@ -115,6 +115,7 @@ function textColorForBg(bgHex: string): string {
 
 const SuperBowlBoard: React.FC = () => {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const boardId = id ?? ''
 
   const [names, setNames] = useState<string[]>([])
@@ -364,6 +365,10 @@ const SuperBowlBoard: React.FC = () => {
   const [showTogglePrompt, setShowTogglePrompt] = useState(false)
   const [togglePassword, setTogglePassword] = useState('')
   const [toggleError, setToggleError] = useState('')
+  const [showDeletePrompt, setShowDeletePrompt] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const handleToggleReadOnly = async () => {
     if (togglePassword.trim().toLowerCase() !== ADMIN_PASSWORD.toLowerCase()) {
@@ -379,6 +384,29 @@ const SuperBowlBoard: React.FC = () => {
       await putSuperBowlSquares(boardId, { readOnly: next })
     } catch {
       setReadOnly(!next)
+    }
+  }
+
+  const handleDeleteBoard = async () => {
+    if (deletePassword.trim().toLowerCase() !== ADMIN_PASSWORD.toLowerCase()) {
+      setDeleteError('Wrong password')
+      return
+    }
+    setIsDeleting(true)
+    setDeleteError('')
+    try {
+      const res = await deleteSuperBowlSquares(boardId)
+      if (res?.success) {
+        setShowDeletePrompt(false)
+        setDeletePassword('')
+        navigate('/superbowl')
+      } else {
+        setDeleteError('Failed to delete board')
+      }
+    } catch {
+      setDeleteError('Failed to delete board')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -606,8 +634,58 @@ const SuperBowlBoard: React.FC = () => {
                 Q3: ${(pot * 0.2).toFixed(2)}
               </span>
               <span className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-full bg-muted border border-border text-xs sm:text-sm font-semibold">
-                <strong>Q4+Final:</strong> ${(pot * 0.4).toFixed(2)}
+                <strong>4th / Final:</strong> ${(pot * 0.4).toFixed(2)}
               </span>
+            </div>
+
+            <div className="pt-4 mt-4 border-t border-border">
+              <span className="text-sm font-medium text-muted-foreground block mb-2">Delete board</span>
+              <p className="text-sm text-muted-foreground mb-3">
+                Permanently remove this board. This cannot be undone. Enter the board password to confirm.
+              </p>
+              {showDeletePrompt ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="password"
+                    placeholder="Password"
+                    value={deletePassword}
+                    onChange={e => { setDeletePassword(e.target.value); setDeleteError('') }}
+                    onKeyDown={e => e.key === 'Enter' && handleDeleteBoard()}
+                    className="h-9 w-[140px] sm:w-[160px]"
+                    autoFocus
+                    disabled={isDeleting}
+                  />
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDeleteBoard}
+                    disabled={isDeleting}
+                    className="gap-1.5"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {isDeleting ? 'Deleting…' : 'Delete board'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setShowDeletePrompt(false); setDeletePassword(''); setDeleteError('') }}
+                    disabled={isDeleting}
+                  >
+                    Cancel
+                  </Button>
+                  {deleteError && <span className="text-destructive text-xs w-full">{deleteError}</span>}
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeletePrompt(true)}
+                  className="gap-1.5 text-destructive border-destructive/50 hover:bg-destructive/10 hover:border-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete this board
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

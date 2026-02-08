@@ -363,6 +363,12 @@ export const putSuperBowlSquares = async (
   return response.data
 }
 
+// Delete Super Bowl squares board by ID
+export const deleteSuperBowlSquares = async (id: string) => {
+  const response = await api.delete(`sb-squares/${id}`)
+  return response.data
+}
+
 export const getGameDetails = async (eventId: string) => {
   const response = await api.get(`/live/${eventId}`)
   return response.data

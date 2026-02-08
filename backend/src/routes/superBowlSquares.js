@@ -148,4 +148,30 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// DELETE /api/sb-squares/:id - Delete board
+router.delete('/:id', async (req, res) => {
+  try {
+    const doc = await SuperBowlSquares.deleteBoard(req.params.id);
+    if (!doc) {
+      return res.status(404).json({
+        success: false,
+        error: 'Board not found'
+      });
+    }
+    res.json({
+      success: true,
+      deleted: true
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[SuperBowlSquares] DELETE error:', error);
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete board',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred'
+    });
+  }
+});
+
 module.exports = router;
