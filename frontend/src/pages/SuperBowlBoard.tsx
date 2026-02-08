@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, Lock, Pencil } from 'lucide-react'
+import { useParams, Link } from 'react-router-dom'
+import { ChevronDown, ChevronUp, Lock, Pencil, ArrowLeft } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -12,8 +13,6 @@ const DEFAULT_TEAM_A_LOGO =
 const DEFAULT_TEAM_B_LOGO =
   'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/NFC.svg/120px-NFC.svg.png'
 
-const CELL = 46
-
 type PeriodKey = 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'FINAL'
 type ScoreState = Record<PeriodKey, { teamA: string; teamB: string }>
 
@@ -25,14 +24,6 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: 'FINAL', label: 'Final Score' },
 ]
 
-// Default rainbow palette (used elsewhere)
-const PLAYER_PALETTE = [
-  '#e11d48', '#f97316', '#eab308', '#84cc16', '#10b981',
-  '#06b6d4', '#0ea5e9', '#6366f1', '#8b5cf6', '#ec4899',
-]
-
-// Super Bowl palette – ordered for max contrast with few players
-// 2 players: red vs teal (opposite hues). 3: red, teal, gold. 4: + purple, etc.
 const SUPERBOWL_TEAM_PALETTE = [
   '#C62828', '#00838F', '#F9A825', '#4527A0', '#2E7D32',
   '#E65100', '#4B92DB', '#AD1457', '#1B4F72', '#37474F',
@@ -112,7 +103,6 @@ function colorForName(
   return mixWithBg(palette[idx], isDark ? 0.5 : 0.4, isDark)
 }
 
-/** Best practice: pick text color by background luminance for WCAG contrast */
 function textColorForBg(bgHex: string): string {
   const { r, g, b } = hexToRgb(bgHex)
   const [rs, gs, bs] = [r, g, b].map(v => {
@@ -123,12 +113,16 @@ function textColorForBg(bgHex: string): string {
   return L < 0.4 ? '#ffffff' : '#1a1a1a'
 }
 
-const SuperBowl: React.FC = () => {
+const SuperBowlBoard: React.FC = () => {
+  const { id } = useParams<{ id: string }>()
+  const boardId = id ?? ''
+
   const [names, setNames] = useState<string[]>([])
   const [squareCost, setSquareCost] = useState(1)
-  const [costInput, setCostInput] = useState('1') // separate for mobile typing; syncs from API
+  const [costInput, setCostInput] = useState('1')
   const [kickoffISO, setKickoffISO] = useState('')
   const [board, setBoard] = useState<string[]>(Array(100).fill(''))
+  const [boardName, setBoardName] = useState('')
   const [newName, setNewName] = useState('')
   const [teamAName, setTeamAName] = useState('AFC')
   const [teamBName, setTeamBName] = useState('NFC')
@@ -145,6 +139,7 @@ const SuperBowl: React.FC = () => {
     dateDisplay?: string
   } | null>(null)
   const [liveError, setLiveError] = useState<string | null>(null)
+  const [notFound, setNotFound] = useState(false)
   const hasLoadedSquares = useRef(false)
   const liveGameRef = useRef(liveGame)
   liveGameRef.current = liveGame
@@ -158,7 +153,6 @@ const SuperBowl: React.FC = () => {
   })
   const [readOnly, setReadOnly] = useState(false)
 
-  // Detect dark mode
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'))
     check()
@@ -167,9 +161,12 @@ const SuperBowl: React.FC = () => {
     return () => observer.disconnect()
   }, [])
 
-  // Load shared squares from API and poll for updates (all visitors see same data)
+  // Load squares from API by board ID
   useEffect(() => {
-        const apply = (d: { names?: string[]; squareCost?: number; kickoffISO?: string; board?: string[]; teamAName?: string; teamBName?: string; teamALogo?: string; teamBLogo?: string; readOnly?: boolean; scores?: Record<string, { teamA?: string; teamB?: string; sea?: string; ne?: string }> }, skipScores = false) => {
+    if (!boardId) return
+
+    const apply = (d: { name?: string; names?: string[]; squareCost?: number; kickoffISO?: string; board?: string[]; teamAName?: string; teamBName?: string; teamALogo?: string; teamBLogo?: string; readOnly?: boolean; scores?: Record<string, { teamA?: string; teamB?: string; sea?: string; ne?: string }> }, skipScores = false) => {
+      if (d.name != null) setBoardName(d.name)
       if (Array.isArray(d.names)) setNames(d.names)
       if (d.squareCost != null) {
         setSquareCost(d.squareCost)
@@ -199,33 +196,36 @@ const SuperBowl: React.FC = () => {
 
     const fetchSquares = async () => {
       try {
-        const res = await getSuperBowlSquares()
+        const res = await getSuperBowlSquares(boardId)
         if (res.success && res.squares) {
-          // Skip scores when liveGame has realtime data (ESPN is authoritative)
           apply(res.squares, !!liveGameRef.current)
           hasLoadedSquares.current = true
+          setNotFound(false)
+        } else {
+          setNotFound(true)
         }
       } catch {
-        /* ignore */
+        setNotFound(true)
       }
     }
 
+    hasLoadedSquares.current = false
     fetchSquares()
-    const interval = setInterval(fetchSquares, 60000) // 60s - reduce load on cheap deployments
+    const interval = setInterval(fetchSquares, 60000)
     return () => clearInterval(interval)
-  }, [])
+  }, [boardId])
 
-  // Save to API when state changes (debounced; skip until we've loaded from API once)
+  // Save to API when state changes (debounced)
   useEffect(() => {
-    if (!hasLoadedSquares.current) return
-    const payload = { names, squareCost, kickoffISO, board, scores, teamAName, teamBName, teamALogo, teamBLogo }
+    if (!boardId || !hasLoadedSquares.current) return
+    const payload = { names, squareCost, kickoffISO, board, scores, teamAName, teamBName, teamALogo, teamBLogo, name: boardName }
     const t = setTimeout(() => {
-      putSuperBowlSquares(payload).catch(() => {})
+      putSuperBowlSquares(boardId, payload).catch(() => {})
     }, 500)
     return () => clearTimeout(t)
-  }, [names, squareCost, kickoffISO, board, scores, teamAName, teamBName, teamALogo, teamBLogo])
+  }, [boardId, names, squareCost, kickoffISO, board, scores, teamAName, teamBName, teamALogo, teamBLogo, boardName])
 
-  // Fetch Super Bowl from ESPN and poll for live updates
+  // Fetch Super Bowl from ESPN
   useEffect(() => {
     const fetchSuperBowl = async () => {
       try {
@@ -262,7 +262,6 @@ const SuperBowl: React.FC = () => {
           setTeamBLogo(g.teamB.logo)
           if (g.kickoffISO) setKickoffISO(g.kickoffISO)
 
-          // Update scores from ESPN linescores
           const lsA = g.teamA.linescores || {}
           const lsB = g.teamB.linescores || {}
           const isFinal = g.status === 'STATUS_FINAL'
@@ -282,7 +281,7 @@ const SuperBowl: React.FC = () => {
     }
 
     fetchSuperBowl()
-    const interval = setInterval(fetchSuperBowl, 15000) // 15s for scores
+    const interval = setInterval(fetchSuperBowl, 15000)
     return () => clearInterval(interval)
   }, [])
 
@@ -306,7 +305,6 @@ const SuperBowl: React.FC = () => {
   const pot = +(squareCost * 100).toFixed(2)
   const digits = Array.from({ length: 10 }, (_, i) => i)
 
-  // Each player gets a unique color (no repeats for up to 10 players)
   const nameToColorIndex = useMemo(() => {
     const map = new Map<string, number>()
     const seen = new Set<string>()
@@ -321,7 +319,6 @@ const SuperBowl: React.FC = () => {
     return map
   }, [names])
 
-  // Super Bowl page: always use distinct palette (10 maximally different hues)
   const playerPalette = SUPERBOWL_TEAM_PALETTE
   const perPerson = names.length > 0 ? Math.floor(100 / names.length) : 0
   const perPersonOwes = +(perPerson * squareCost).toFixed(2)
@@ -358,14 +355,12 @@ const SuperBowl: React.FC = () => {
 
   const scoresFromRealtime = !!liveGame
 
-  // Square that would win if the quarter ended right now (live only)
   const liveCurrentWinnerIdx = liveGame?.isLive
     ? (Math.abs(liveGame.teamB.score) % 10) * 10 + (Math.abs(liveGame.teamA.score) % 10)
     : null
 
   const [setupOpen, setSetupOpen] = useState(false)
 
-  // Toggle read-only: password-protected, persists in DB
   const [showTogglePrompt, setShowTogglePrompt] = useState(false)
   const [togglePassword, setTogglePassword] = useState('')
   const [toggleError, setToggleError] = useState('')
@@ -381,10 +376,38 @@ const SuperBowl: React.FC = () => {
     setTogglePassword('')
     setToggleError('')
     try {
-      await putSuperBowlSquares({ readOnly: next })
+      await putSuperBowlSquares(boardId, { readOnly: next })
     } catch {
-      setReadOnly(!next) // revert on failure
+      setReadOnly(!next)
     }
+  }
+
+  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/superbowl/${boardId}` : ''
+
+  if (!boardId) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Invalid board URL.</p>
+          <Link to="/superbowl">
+            <Button variant="outline">Back to Super Bowl Squares</Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Board not found.</p>
+          <Link to="/superbowl">
+            <Button variant="outline">Back to Super Bowl Squares</Button>
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -424,14 +447,22 @@ const SuperBowl: React.FC = () => {
           </div>
         )}
 
-        {/* Header - single line */}
+        {/* Header */}
         <div className="mb-4 sm:mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
+          <Link to="/superbowl" className="shrink-0">
+            <Button variant="ghost" size="sm" className="gap-1.5">
+              <ArrowLeft className="h-4 w-4" />
+              Boards
+            </Button>
+          </Link>
           {(liveGame?.dateDisplay || kickoffISO) && (
             <span className="text-sm sm:text-base font-semibold text-muted-foreground truncate">
               {liveGame?.dateDisplay ?? (kickoffISO ? new Date(kickoffISO).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' }) : '')}
             </span>
           )}
-          <h1 className="text-xl sm:text-2xl font-bold">Super Bowl Squares</h1>
+          <h1 className="text-xl sm:text-2xl font-bold truncate">
+            {boardName || 'Super Bowl Squares'}
+          </h1>
           <ColorSchemeToggler />
           {showTogglePrompt ? (
               <div className="flex items-center gap-2 flex-wrap">
@@ -475,9 +506,14 @@ const SuperBowl: React.FC = () => {
           )}
         </div>
 
+        {/* Share link */}
+        <div className="mb-4 text-sm text-muted-foreground">
+          Share this board: <code className="bg-muted px-1.5 py-0.5 rounded text-xs break-all">{shareUrl}</code>
+        </div>
+
         {/* Content - Board first, Setup last */}
         <div className="flex flex-col">
-          {/* Setup Card - last, collapsible on mobile */}
+          {/* Setup Card */}
           <Card className="mb-4 sm:mb-6 order-4">
             <CardHeader
               className="sm:cursor-default cursor-pointer select-none touch-manipulation min-h-[44px] sm:min-h-0"
@@ -492,6 +528,15 @@ const SuperBowl: React.FC = () => {
             </CardHeader>
           <CardContent className={`space-y-4 ${!setupOpen ? 'hidden sm:block' : ''}`}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground block mb-2">Board name</label>
+                <Input
+                  value={boardName}
+                  onChange={e => setBoardName(e.target.value)}
+                  placeholder="e.g. Work pool"
+                  disabled={readOnly}
+                />
+              </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground block mb-2">
                   Kickoff Time {liveGame?.kickoffISO && <span className="text-xs">(from ESPN)</span>}
@@ -567,13 +612,12 @@ const SuperBowl: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Scores & Winners Card - 2nd */}
+        {/* Scores & Winners Card */}
         <Card className="mb-4 sm:mb-6 order-2">
           <CardHeader>
             <CardTitle>Scores & Winners</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Mobile: compact cards per period */}
             <div className="block sm:hidden space-y-3">
               {PERIODS.map(p => {
                 const w = winners[p.key]
@@ -615,7 +659,6 @@ const SuperBowl: React.FC = () => {
                 )
               })}
             </div>
-            {/* Desktop: table layout */}
             <div className="hidden sm:block overflow-x-auto">
               <div className="min-w-[560px]">
                 <div className="grid grid-cols-[2.2fr_1fr_1fr_2.2fr] gap-2 items-center">
@@ -674,7 +717,7 @@ const SuperBowl: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Players Card - 3rd */}
+        {/* Players Card */}
         <Card className="mb-4 sm:mb-6 order-3">
           <CardHeader>
             <CardTitle>Players</CardTitle>
@@ -733,13 +776,12 @@ const SuperBowl: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Board Card - first */}
+        {/* Board Card */}
         <Card className="order-1 mb-4 sm:mb-6">
           <CardHeader>
             <CardTitle>Board</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Live score at top of Board */}
             {(liveGame || teamAName || teamBName) && (
               <div className="flex items-center justify-center gap-2 sm:gap-4 py-3 sm:py-4 mb-2 px-3 sm:px-4 rounded-xl bg-muted/80 border border-border">
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 sm:flex-initial sm:min-w-[100px] justify-end">
@@ -776,7 +818,6 @@ const SuperBowl: React.FC = () => {
                   rowGap: 8,
                 }}
               >
-                {/* Team A header */}
                 <div />
                 <div />
                 <div className="flex justify-center">
@@ -786,7 +827,6 @@ const SuperBowl: React.FC = () => {
                   </div>
                 </div>
 
-                {/* X axis digits */}
                 <div />
                 <div />
                 <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(10, 1fr)' }}>
@@ -801,7 +841,6 @@ const SuperBowl: React.FC = () => {
                   ))}
                 </div>
 
-                {/* Team B header (vertical) */}
                 <div
                   className="flex justify-center items-center rounded-xl bg-muted border-2 border-destructive"
                   style={{ height: 'calc(var(--cell, 46px) * 10 + 4 * 9)' }}
@@ -815,7 +854,6 @@ const SuperBowl: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Y axis digits */}
                 <div className="grid gap-1" style={{ gridTemplateRows: 'repeat(10, var(--cell, 46px))' }}>
                   {digits.map(d => (
                     <div
@@ -827,7 +865,6 @@ const SuperBowl: React.FC = () => {
                   ))}
                 </div>
 
-                {/* Board grid */}
                 <div
                   className="grid gap-1"
                   style={{
@@ -861,4 +898,4 @@ const SuperBowl: React.FC = () => {
   )
 }
 
-export default SuperBowl
+export default SuperBowlBoard

@@ -22,13 +22,14 @@ import Data from './pages/Data'
 import News from './pages/News'
 import Money from './pages/Money'
 import Orangemen from './pages/Orangemen'
-import SuperBowl from './pages/SuperBowl'
+import SuperBowlLanding from './pages/SuperBowlLanding'
+import SuperBowlBoard from './pages/SuperBowlBoard'
 import Snowflakes from './components/Snowflakes'
 
 function AppContent() {
   const { colorScheme } = useColorScheme()
   const location = useLocation()
-  const isSuperBowlPage = location.pathname === '/superbowl'
+  const isSuperBowlPage = location.pathname.startsWith('/superbowl')
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [passwordPromptOpen, setPasswordPromptOpen] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -82,7 +83,8 @@ function AppContent() {
       {!isSuperBowlPage && <Snowflakes />}
       <Routes>
           <Route path="/orangemen" element={<Orangemen />} />
-          <Route path="/superbowl" element={<SuperBowl />} />
+          <Route path="/superbowl" element={<SuperBowlLanding />} />
+          <Route path="/superbowl/:id" element={<SuperBowlBoard />} />
           <Route path="/" element={<Layout onConfigClick={handleConfigClick}><Dashboard /></Layout>} />
           <Route path="/league" element={<Layout onConfigClick={handleConfigClick}><League /></Layout>} />
           <Route path="/analytics" element={<Layout onConfigClick={handleConfigClick}><Analytics /></Layout>} />

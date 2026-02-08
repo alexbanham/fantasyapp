@@ -306,26 +306,60 @@ export const getSuperBowlGame = async () => {
   return response.data
 }
 
-// Get shared Super Bowl squares config (all visitors see same data)
-export const getSuperBowlSquares = async () => {
-  const response = await api.get('sb-squares')
+// Super Bowl squares board data shape
+export interface SuperBowlSquaresData {
+  id?: string
+  name?: string
+  names: string[]
+  squareCost: number
+  kickoffISO: string
+  board: string[]
+  teamAName: string
+  teamBName: string
+  teamALogo: string
+  teamBLogo: string
+  readOnly: boolean
+  scores?: Record<string, { teamA: string; teamB: string }>
+  lastUpdated?: string
+}
+
+// List all Super Bowl squares boards
+export const listSuperBowlSquares = async (limit?: number) => {
+  const params = limit != null ? `?limit=${limit}` : ''
+  const response = await api.get(`sb-squares${params}`)
   return response.data
 }
 
-// Update shared Super Bowl squares config
-export const putSuperBowlSquares = async (data: {
-  names?: string[]
-  squareCost?: number
-  kickoffISO?: string
-  board?: string[]
-  teamAName?: string
-  teamBName?: string
-  teamALogo?: string
-  teamBLogo?: string
-  readOnly?: boolean
-  scores?: Record<string, { teamA: string; teamB: string }>
-}) => {
-  const response = await api.put('sb-squares', data)
+// Get single Super Bowl squares board by ID
+export const getSuperBowlSquares = async (id: string) => {
+  const response = await api.get(`sb-squares/${id}`)
+  return response.data
+}
+
+// Create new Super Bowl squares board
+export const createSuperBowlSquares = async (data?: { name?: string; teamAName?: string; teamBName?: string }) => {
+  const response = await api.post('sb-squares', data || {})
+  return response.data
+}
+
+// Update Super Bowl squares board by ID
+export const putSuperBowlSquares = async (
+  id: string,
+  data: {
+    name?: string
+    names?: string[]
+    squareCost?: number
+    kickoffISO?: string
+    board?: string[]
+    teamAName?: string
+    teamBName?: string
+    teamALogo?: string
+    teamBLogo?: string
+    readOnly?: boolean
+    scores?: Record<string, { teamA: string; teamB: string }>
+  }
+) => {
+  const response = await api.put(`sb-squares/${id}`, data)
   return response.data
 }
 

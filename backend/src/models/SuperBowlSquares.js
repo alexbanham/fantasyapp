@@ -5,8 +5,9 @@ const scoreStateSchema = new mongoose.Schema({
   teamB: { type: String, default: '' }
 }, { _id: false });
 
-// All user-settable params persisted in MongoDB for all visitors
+// Each document is one squares board; URL is /superbowl/:id with doc._id
 const superBowlSquaresSchema = new mongoose.Schema({
+  name: { type: String, default: '' }, // Optional display name (e.g. "Work pool", "Family")
   names: { type: [String], default: [] },
   squareCost: { type: Number, default: 1, min: 0 }, // Cost per square ($)
   kickoffISO: { type: String, default: '' },
@@ -25,48 +26,58 @@ const superBowlSquaresSchema = new mongoose.Schema({
   },
   lastUpdated: { type: Date, default: Date.now }
 }, {
-  timestamps: true,
-  // Ensure a single document - use static methods
+  timestamps: true
 });
 
-superBowlSquaresSchema.statics.getSquares = async function () {
-  let doc = await this.findOne();
-  if (!doc) {
-    doc = new this({
-      names: [],
-      squareCost: 1,
-      kickoffISO: '',
-      board: Array(100).fill(''),
-      teamAName: 'AFC',
-      teamBName: 'NFC',
-      teamALogo: '',
-      teamBLogo: '',
-      scores: {
-        Q1: { teamA: '', teamB: '' },
-        Q2: { teamA: '', teamB: '' },
-        Q3: { teamA: '', teamB: '' },
-        Q4: { teamA: '', teamB: '' },
-        FINAL: { teamA: '', teamB: '' }
-      }
-    });
-    await doc.save();
-  }
+superBowlSquaresSchema.index({ lastUpdated: -1 });
+
+// List all boards (most recent first)
+superBowlSquaresSchema.statics.listBoards = async function (limit = 50) {
+  return this.find().sort({ lastUpdated: -1 }).limit(limit).lean();
+};
+
+// Get single board by ID
+superBowlSquaresSchema.statics.getById = async function (id) {
+  if (!mongoose.Types.ObjectId.isValid(id)) return null;
+  return this.findById(id).lean();
+};
+
+// Create new board
+superBowlSquaresSchema.statics.createBoard = async function (overrides = {}) {
+  const doc = new this({
+    name: overrides.name || '',
+    names: overrides.names || [],
+    squareCost: overrides.squareCost ?? 1,
+    kickoffISO: overrides.kickoffISO || '',
+    board: overrides.board && overrides.board.length === 100 ? overrides.board : Array(100).fill(''),
+    teamAName: overrides.teamAName || 'AFC',
+    teamBName: overrides.teamBName || 'NFC',
+    teamALogo: overrides.teamALogo || '',
+    teamBLogo: overrides.teamBLogo || '',
+    scores: overrides.scores || {
+      Q1: { teamA: '', teamB: '' },
+      Q2: { teamA: '', teamB: '' },
+      Q3: { teamA: '', teamB: '' },
+      Q4: { teamA: '', teamB: '' },
+      FINAL: { teamA: '', teamB: '' }
+    }
+  });
+  await doc.save();
   return doc;
 };
 
-superBowlSquaresSchema.statics.updateSquares = async function (updates) {
-  let doc = await this.findOne();
-  if (!doc) {
-    doc = new this(updates);
-  } else {
-    const allowed = ['names', 'squareCost', 'kickoffISO', 'board', 'teamAName', 'teamBName', 'teamALogo', 'teamBLogo', 'readOnly', 'scores'];
-    for (const key of allowed) {
-      if (updates[key] !== undefined) {
-        doc[key] = updates[key];
-      }
+// Update board by ID
+superBowlSquaresSchema.statics.updateBoard = async function (id, updates) {
+  if (!mongoose.Types.ObjectId.isValid(id)) return null;
+  const doc = await this.findById(id);
+  if (!doc) return null;
+  const allowed = ['name', 'names', 'squareCost', 'kickoffISO', 'board', 'teamAName', 'teamBName', 'teamALogo', 'teamBLogo', 'readOnly', 'scores'];
+  for (const key of allowed) {
+    if (updates[key] !== undefined) {
+      doc[key] = updates[key];
     }
-    doc.lastUpdated = new Date();
   }
+  doc.lastUpdated = new Date();
   await doc.save();
   return doc;
 };

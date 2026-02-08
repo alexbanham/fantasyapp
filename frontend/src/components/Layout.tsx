@@ -49,7 +49,7 @@ const Layout = ({ children, onConfigClick }: LayoutProps) => {
     { name: 'News', href: '/news', icon: Newspaper, current: location.pathname === '/news' },
     { name: 'Money', href: '/money', icon: DollarSign, current: location.pathname === '/money' },
     { name: 'Data', href: '/data', icon: Database, current: location.pathname === '/data' },
-    { name: 'Super Bowl', href: '/superbowl', icon: LayoutGrid, current: location.pathname === '/superbowl' },
+    { name: 'Super Bowl', href: '/superbowl', icon: LayoutGrid, current: location.pathname.startsWith('/superbowl') },
   ]
 
   return (
